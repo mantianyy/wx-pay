@@ -34,9 +34,9 @@ wx:
   #申请交易账单
   apply-tradebill: https://api.mch.weixin.qq.com/v3/bill/tradebill
   #微信支付回调通知
-  pay_order_notify: https://68p076249i.zicp.fun/pay/create/result/notify
+  pay_order_notify: https://68p076249i.zicp.fun/wx-pay/create/result/notify
   #微信退款回调通知
-  refund_order_notify: https://68p076249i.zicp.fun/pay/create/result/refund-notify
+  refund_order_notify: https://68p076249i.zicp.fun/wx-pay/create/result/refund-notify
   open-id: oUYWT5AvRQgX1Z9prDMqXrwYY_wk
   app-id: wx6f8b36de02f6af65
   secret: f2054aa12404c43094e4b541b3d4426d
