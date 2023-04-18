@@ -4,7 +4,6 @@ import com.alibaba.fastjson.annotation.JSONField;
 import com.wx.pay.common.ChannelEnum;
 import com.wx.pay.common.FundAccountEnum;
 import com.wx.pay.common.StatusEnum;
-import com.wx.pay.dto.refund.AmountDto;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;

@@ -53,6 +53,10 @@ public class PayProperties {
      **/
     private String applyTradebill;
     /**
+     * 申请资金账单
+     */
+    private String applyFundbill;
+    /**
      * 申请交易账单
      **/
     private String appId;

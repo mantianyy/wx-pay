@@ -2,7 +2,6 @@ package com.wx.pay.dto.refund;
 
 import com.alibaba.fastjson.annotation.JSONField;
 import com.fasterxml.jackson.annotation.JsonEnumDefaultValue;
-import com.wx.pay.common.AccountEnum;
 import com.wx.pay.common.FundAccountEnum;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;

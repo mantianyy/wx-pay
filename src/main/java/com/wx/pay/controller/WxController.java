@@ -1,38 +1,42 @@
 package com.wx.pay.controller;
 
 
-import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.annotation.JSONField;
 import com.wechat.pay.contrib.apache.httpclient.util.AesUtil;
-import com.wx.pay.common.*;
+import com.wx.pay.common.CurrencyEnum;
+import com.wx.pay.common.FundAccountEnum;
+import com.wx.pay.common.R;
+import com.wx.pay.common.ResultCode;
 import com.wx.pay.dto.*;
+import com.wx.pay.dto.apply_tradebill.ApplyTradeDto;
 import com.wx.pay.dto.refund.RefundDto;
 import com.wx.pay.dto.refund.RefundGoods;
-import com.wx.pay.dto.refund.RefundSourceDto;
 import com.wx.pay.dto.refund_result.RefundNotifyDto;
 import com.wx.pay.prop.PayProperties;
+import com.wx.pay.util.RSAUtil;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiModelProperty;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.HttpEntity;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
-import org.junit.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SignatureException;
 import java.util.*;
 
 @CrossOrigin
@@ -49,7 +53,10 @@ public class WxController {
 
     @ApiOperation(value = "统一下单接口")
     @PostMapping("/createOrder")
-    public R createOrder() {
+    public R createOrder(String openId) {
+        if(StringUtils.isEmpty(openId)){
+            return R.error(ResultCode.ERROR, null, "openid为空");
+        }
         HttpPost httpPost = new HttpPost(payProperties.getCreateOrder());
         CreateOrderDto createOrderDto = new CreateOrderDto();
         createOrderDto.setAppId(payProperties.getAppId());
@@ -58,13 +65,13 @@ public class WxController {
                 toString().replaceAll("-", "").toUpperCase();
         createOrderDto.setOutTradeNo(outTradeNo);
         createOrderDto.setDesc("Image形象店-深圳腾大-QQ公仔");
-        createOrderDto.setNotifyUrl("https://68p076249i.zicp.fun/wx-paypay/create/result/notify");
+        createOrderDto.setNotifyUrl(payProperties.getPayOrderNotify());
         AmountDto amountDto = new AmountDto();
         amountDto.setCurrency(CurrencyEnum.CNY);
         amountDto.setTotal(1);
         createOrderDto.setAmountDto(amountDto);
         PayerDto payerDto = new PayerDto();
-        payerDto.setOpenId("0d1AxOFa1n3z8F0WDUFa1POXwr3AxOFA");
+        payerDto.setOpenId(openId);
         createOrderDto.setPayerDto(payerDto);
         String reqParma = JSONObject.toJSONString(createOrderDto);
 
@@ -187,7 +194,7 @@ public class WxController {
         if(StringUtils.isEmpty(transactionId)&&StringUtils.isEmpty(outTradeNo)){
             return R.error(ResultCode.ERROR, null, "transactionId or outTradeNo为空!");
         }
-        com.wx.pay.dto.refund.RefundDto refundDto = new RefundDto();
+        RefundDto refundDto = new RefundDto();
         refundDto.setTransactionId(null);
         refundDto.setOutTradeNo(StringUtils.isEmpty(outTradeNo)?null:outTradeNo);
         refundDto.setOutRefundNo(RandomUtil.randomString(32).toString().toUpperCase());
@@ -301,4 +308,175 @@ public class WxController {
         return result;
     }
 
+    @ApiOperation(value = "查询单笔退款")
+    @PostMapping("/result/queryRefundResult")
+    public Map queryRefundResult(String outRefundNo) throws IOException {
+        if(StringUtils.isEmpty(outRefundNo)){
+            return R.error("outRefundNo 为空");
+        }
+        String refundQueryUrl = payProperties.getRefundQuery().replaceAll("\\{out-refund-no}","");
+        StringBuilder stringBuilder = new StringBuilder(refundQueryUrl);
+        stringBuilder.append(outRefundNo);
+
+        HttpGet httpGet = new HttpGet(stringBuilder.toString());
+        StringEntity entity = new StringEntity("", "UTF-8");
+        entity.setContentType("application/json");
+        httpGet.setHeader("Accept", "application/json");
+
+        String jsonRes = null;
+        CloseableHttpResponse response = null;
+        //查询单笔退款信息
+        try {
+            response = (CloseableHttpResponse) httpClient.execute(httpGet);
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode == 200) {
+                System.out.println("success,return body = " + EntityUtils.toString(response.getEntity()));
+                //解析prepay_id
+                jsonRes = EntityUtils.toString(response.getEntity());
+            } else if (statusCode == 204) {
+                System.out.println("success");
+            } else {
+                System.out.println("failed,resp code = " + statusCode + ",return body = " + EntityUtils.toString(response.getEntity()));
+                return R.error("订单查询失败");
+            }
+        } catch (Exception e) {
+            log.info("订单查询异常 {}", e.getLocalizedMessage());
+            return R.error("订单查询异常");
+        } finally {
+            response.close();
+        }
+        return R.ok(JSON.parseObject(jsonRes));
+    }
+
+
+    @ApiOperation(value = "申请交易账单查询")
+    @PostMapping("/result/applyTradebill")
+    public Map applyTradebill(ApplyTradeDto applyTradeDto) throws IOException {
+        if(StringUtils.isEmpty(applyTradeDto)){
+            return R.error("参数为空");
+        }
+
+        if(StringUtils.isEmpty(applyTradeDto.getBillDate())){
+            return R.error("bill_date 为空");
+        }
+        String applyTradebillUrl = payProperties.getApplyTradebill();
+        StringBuilder stringBuilder = new StringBuilder(applyTradebillUrl);
+        stringBuilder.append("?bill_date="+applyTradeDto.getBillDate());
+        stringBuilder.append("&bill_type=ALL");
+        stringBuilder.append("&tar_type=GZIP");
+
+        HttpGet httpGet = new HttpGet(stringBuilder.toString());
+        StringEntity entity = new StringEntity("", "UTF-8");
+        entity.setContentType("application/json");
+        httpGet.setHeader("Accept", "application/json");
+
+        String jsonRes = null;
+        CloseableHttpResponse response = null;
+        //查询单笔退款信息
+        try {
+            response = (CloseableHttpResponse) httpClient.execute(httpGet);
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode == 200) {
+                System.out.println("success,return body = " + EntityUtils.toString(response.getEntity()));
+                //解析prepay_id
+                jsonRes = EntityUtils.toString(response.getEntity());
+            } else if (statusCode == 204) {
+                System.out.println("success");
+            } else {
+                System.out.println("failed,resp code = " + statusCode + ",return body = " + EntityUtils.toString(response.getEntity()));
+                return R.error("订单查询失败");
+            }
+        } catch (Exception e) {
+            log.info("订单查询异常 {}", e.getLocalizedMessage());
+            return R.error("订单查询异常");
+        } finally {
+            response.close();
+        }
+        return R.ok(JSON.parseObject(jsonRes));
+    }
+
+    @ApiOperation(value = "申请资金账单查询")
+    @PostMapping("/result/applyFundbill")
+    public Map applyFundbill(ApplyTradeDto applyTradeDto) throws IOException {
+        if(StringUtils.isEmpty(applyTradeDto)){
+            return R.error("参数为空");
+        }
+        if(StringUtils.isEmpty(applyTradeDto.getBillDate())){
+            return R.error("bill_date 为空");
+        }
+        String applyTradebillUrl = payProperties.getApplyFundbill();
+        StringBuilder stringBuilder = new StringBuilder(applyTradebillUrl);
+        stringBuilder.append("?bill_date="+applyTradeDto.getBillDate());
+        stringBuilder.append("&account_type=BASIC");
+        stringBuilder.append("&tar_type=GZIP");
+
+        HttpGet httpGet = new HttpGet(stringBuilder.toString());
+        StringEntity entity = new StringEntity("", "UTF-8");
+        entity.setContentType("application/json");
+        httpGet.setHeader("Accept", "application/json");
+
+        String jsonRes = null;
+        CloseableHttpResponse response = null;
+        //查询单笔退款信息
+        try {
+            response = (CloseableHttpResponse) httpClient.execute(httpGet);
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode == 200) {
+                System.out.println("success,return body = " + EntityUtils.toString(response.getEntity()));
+                //解析prepay_id
+                jsonRes = EntityUtils.toString(response.getEntity());
+            } else if (statusCode == 204) {
+                System.out.println("success");
+            } else {
+                System.out.println("failed,resp code = " + statusCode + ",return body = " + EntityUtils.toString(response.getEntity()));
+                return R.error("订单查询失败");
+            }
+        } catch (Exception e) {
+            log.info("订单查询异常 {}", e.getLocalizedMessage());
+            return R.error("订单查询异常");
+        } finally {
+            response.close();
+        }
+        return R.ok(JSON.parseObject(jsonRes));
+    }
+
+
+    @ApiOperation(value = "下载账单")
+    @PostMapping("/result/downloadBill")
+    public Map downloadBill(String downloadUrl) throws IOException, SignatureException, NoSuchAlgorithmException, InvalidKeyException {
+        if(StringUtils.isEmpty(downloadUrl)){
+            return R.error("下载地址为空");
+        }
+        HttpGet httpGet2 = new HttpGet(downloadUrl);
+        httpGet2.setHeader("Authorization","WECHATPAY2-SHA256-RSA2048 mchid="+payProperties.getMchId());
+        httpGet2.setHeader("nonce_str",payProperties.getMchSerialno());
+        String nonceStr = RandomUtil.randomString(32);
+        httpGet2.setHeader("signature", RSAUtil.getToken2(downloadUrl,nonceStr));
+        //请求下载地址
+        CloseableHttpResponse response=null;
+        try {
+            response = (CloseableHttpResponse) httpClient.execute(httpGet2);
+            String fileName = response.getHeaders("Content-Disposition")[0].getValue().split("filename=")[1];
+            log.info("文件名为" + fileName);
+
+            if (response.getStatusLine().getStatusCode() == 200) {
+                //得到实体
+                HttpEntity entity3 = response.getEntity();
+                byte[] data = EntityUtils.toByteArray(entity3);
+                //存入磁盘
+                FileOutputStream fos = new FileOutputStream(fileName);
+                fos.write(data);
+                fos.close();
+                log.info("文件下载成功！");
+            } else {
+                return R.ok("文件下载失败！Http状态码为" + response.getStatusLine().getStatusCode(),null);
+            }
+        } catch (Exception e) {
+            log.info("文件下载失败 {}", e.getLocalizedMessage());
+            return R.error("文件下载失败");
+        } finally {
+            response.close();
+        }
+        return R.ok("下载成功",null);
+    }
 }
