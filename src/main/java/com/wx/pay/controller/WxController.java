@@ -29,6 +29,7 @@ import com.wx.pay.dto.refund_result.RefundNotifyDto;
 import com.wx.pay.prop.PayProperties;
 import com.wx.pay.util.FileUtil;
 import com.wx.pay.util.RSAUtil;
+import com.wx.pay.util.StreamUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiModelProperty;
 import io.swagger.annotations.ApiOperation;
@@ -51,10 +52,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
@@ -482,22 +480,43 @@ public class WxController {
             response = httpClient.execute(httpGet);
             HttpEntity entity = response.getEntity();
             if (!ObjectUtil.isEmpty(entity)) {
-                FileUtil.writeFile(httpResponse,response.getEntity().getContent());
-//
+                String fileName = URLEncoder.encode("交易账单", "UTF-8");
+                httpResponse.setContentType("application/vnd.ms-excel");
+                httpResponse.setCharacterEncoding("utf-8");
+                httpResponse.setContentType("application/force-download");
+                httpResponse.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+                httpResponse.setHeader("Content-Disposition", "attachment;filename=" + fileName + ".xlsx");
+                httpResponse.setHeader("Content-Type","application/octet-stream;charset=utf-8");
+                //FileUtil.writeFile(httpResponse,response.getEntity().getContent());
+                String contentEncoding = entity.getContentType().getValue();
+                InputStream stream = entity.getContent();
+                InputStream inputStream = StreamUtils.getInputStream(stream, contentEncoding);
 //                setExcelRespProp(httpResponse, "交易账单");
-//                 String bodyAsString = EntityUtils.toString(entity);
-//                log.info("result is {}",bodyAsString);
-//                if(bodyAsString.contains("INVALID_REQUEST")){
-//                    httpResponse.getWriter().write(JSON.toJSONString(R.error("文件下载失败")));
-//                    return;
-//                }
-//                List<Map> list = JSON.parseArray(bodyAsString, Map.class);
-//                List<BillExcelDto> billExcelDtoList = null;
-//                EasyExcel.write(httpResponse.getOutputStream())
-//                        .head(BillExcelDto.class)
-//                        .excelType(ExcelTypeEnum.XLSX)
-//                        .sheet("交易账单")
-//                        .doWrite(billExcelDtoList);
+
+                 String bodyAsString = StreamUtils.stream2String(inputStream);
+                log.info("result is {}",bodyAsString);
+                if(bodyAsString.contains("INVALID_REQUEST")){
+                    httpResponse.getWriter().write(JSON.toJSONString(R.error("文件下载失败")));
+                    return;
+                }
+                List<String> strings = Arrays.asList(bodyAsString.split("\n"));
+                List<List<String>> dataList = new ArrayList<>();
+                strings.forEach(s->{
+                    List<String> data = Arrays.asList(s.replaceAll("`","").toString().split(","));
+                    final int[] i = {0};
+                    data.forEach(raw->{
+                        String value = TransactionBillEnum.getKey(raw);
+                        data.set(i[0],StringUtils.isEmpty(value)?raw:value);
+                        i[0]++;
+                    });
+                    dataList.add(data);
+                });
+                dataList.remove(0);
+                EasyExcel.write(httpResponse.getOutputStream())
+                        .head(BillExcelDto.class)
+                        .excelType(ExcelTypeEnum.XLSX)
+                        .sheet("交易账单")
+                        .doWrite(dataList);
             } else {
                 httpResponse.getWriter().write(JSON.toJSONString(R.error("文件下载失败")));
             }

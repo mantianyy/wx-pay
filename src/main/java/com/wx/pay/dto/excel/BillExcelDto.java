@@ -2,6 +2,7 @@ package com.wx.pay.dto.excel;
 
 import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.annotation.write.style.ColumnWidth;
+import com.alibaba.fastjson.annotation.JSONField;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -12,6 +13,41 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class BillExcelDto {
+    @ExcelProperty("交易时间")
+    @ColumnWidth(10)
+    @ApiModelProperty("交易时间")
+    private String transactionHour;
+
+    @ExcelProperty("公众账号ID")
+    @ColumnWidth(10)
+    @ApiModelProperty("公众账号ID")
+    private String publicAccountId;
+
+    @ExcelProperty("商户号")
+    @ColumnWidth(10)
+    @ApiModelProperty("商户号")
+    private String businessNumber;
+
+    @ExcelProperty("特约商户号")
+    @ColumnWidth(10)
+    @ApiModelProperty("特约商户号")
+    private String specialMerchantNumber;
+
+    @ExcelProperty("设备号")
+    @ColumnWidth(10)
+    @ApiModelProperty("设备号")
+    private String deviceNo;
+
+    @ExcelProperty("微信订单号")
+    @ColumnWidth(10)
+    @ApiModelProperty("微信订单号")
+    private String weChatOrderNumber;
+
+    @ExcelProperty("商户订单号")
+    @ColumnWidth(10)
+    @ApiModelProperty("商户订单号")
+    private String merchantOrderNumber;
+
     @ExcelProperty("用户标识")
     @ColumnWidth(10)
     @ApiModelProperty("用户标识")

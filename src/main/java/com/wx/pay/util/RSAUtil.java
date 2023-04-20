@@ -68,25 +68,28 @@ public class RSAUtil {
         }
         String privateKeyString = FileUtil.getValue(path);
         PrivateKey privateKey = PemUtil.loadPrivateKey(privateKeyString);
-        String signature = sign(getMessage(download_url).getBytes("utf-8"), privateKey);
+//        String appid = "wx6f8b36de02f6af65";
+        String mchid = "1641770912";
+        String serial_no = "670CFBD729DE9AC29CA51886E11F0B2A0956B69D";
+        String timeStamp = String.valueOf(System.currentTimeMillis() / 1000);
+        String signature = sign(getMessage2(download_url,mchid,nonceStr,timeStamp,serial_no).getBytes("utf-8"), privateKey);
         System.out.println("对download_url签名");
         System.out.println(signature);
-        return "mchid=\"" + 1641770912 + "\","
-                + "nonce_str=\"" + nonceStr + "\","
-                + "timestamp=\"" + timestamp + "\","
-                + "serial_no=\"" + "670CFBD729DE9AC29CA51886E11F0B2A0956B69D" + "\","
-                + "signature=\"" + signature + "\"";
+        return "mchid="+"1641770912,nonce_str="+nonceStr+",signature="+signature+",timestamp="
+                +timestamp+",serial_no="+"670CFBD729DE9AC29CA51886E11F0B2A0956B69D";
     }
 
-    public static String getMessage2(String download_url) {
-        String appid = "wx6f8b36de02f6af65";
+    public static String getMessage2(String download_url,String mchid,String nonceStr,String timesStamp,String serial_no) {
+//        String appid = "wx6f8b36de02f6af65";
         String timeStamp = String.valueOf(System.currentTimeMillis() / 1000);
-        String random = RandomUtil.randomString(32);
+//        String random = RandomUtil.randomString(32);
         StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append(appid).append("\n");
-        stringBuilder.append(timeStamp).append("\n");
-        stringBuilder.append(random).append("\n");
-        stringBuilder.append("prepay_id=" + download_url).append("\n");
+//        stringBuilder.append(appid).append("\n");
+        stringBuilder.append(mchid).append("\n");
+        stringBuilder.append(nonceStr).append("\n");
+        stringBuilder.append(timesStamp).append("\n");
+        stringBuilder.append(serial_no).append("\n");
+//        stringBuilder.append("download_url=" + download_url).append("\n");
         System.out.println("message========");
         System.out.println("结果" + stringBuilder.toString());
         return stringBuilder.toString();

@@ -4,7 +4,9 @@ package com.wx.pay.common;
  * @author jiang漫天
  */
 public enum TarTypeEnum {
-    GZIP("GZIP", "GZIP压缩包");
+    GZIP("gzip", "GZIP压缩包"),
+    XLSX("xlsx", "xlsx"),
+    CSV("csv", "xlsx");
 
     private String key;
     private String value;
