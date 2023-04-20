@@ -1,43 +1,69 @@
 package com.wx.pay.controller;
 
 
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpUtil;
+import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.support.ExcelTypeEnum;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.annotation.JSONField;
+import com.ijpay.core.kit.WxPayKit;
+import com.ijpay.wxpay.WxPayApi;
+import com.ijpay.wxpay.enums.WxApiType;
+import com.ijpay.wxpay.enums.WxDomain;
+import com.wechat.pay.contrib.apache.httpclient.WechatPayHttpClientBuilder;
 import com.wechat.pay.contrib.apache.httpclient.util.AesUtil;
-import com.wx.pay.common.CurrencyEnum;
-import com.wx.pay.common.FundAccountEnum;
-import com.wx.pay.common.R;
-import com.wx.pay.common.ResultCode;
+import com.wechat.pay.contrib.apache.httpclient.util.PemUtil;
+import com.wx.pay.common.*;
 import com.wx.pay.dto.*;
 import com.wx.pay.dto.apply_tradebill.ApplyTradeDto;
+import com.wx.pay.dto.excel.BillExcelDto;
 import com.wx.pay.dto.refund.RefundDto;
 import com.wx.pay.dto.refund.RefundGoods;
+import com.wx.pay.dto.refund.RefundSourceDto;
 import com.wx.pay.dto.refund_result.RefundNotifyDto;
 import com.wx.pay.prop.PayProperties;
+import com.wx.pay.util.FileUtil;
 import com.wx.pay.util.RSAUtil;
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiModelProperty;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.ResourceUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.SignatureException;
 import java.util.*;
+
+import static com.ijpay.core.kit.RsaKit.getPrivateKey;
 
 @CrossOrigin
 @RequestMapping("/create")
@@ -50,11 +76,13 @@ public class WxController {
     private PayProperties payProperties;
     @Resource
     private HttpClient httpClient;
+    @Resource
+    private WechatPayHttpClientBuilder wechatPayHttpClientBuilder;
 
     @ApiOperation(value = "统一下单接口")
     @PostMapping("/createOrder")
     public R createOrder(String openId) {
-        if(StringUtils.isEmpty(openId)){
+        if (StringUtils.isEmpty(openId)) {
             return R.error(ResultCode.ERROR, null, "openid为空");
         }
         HttpPost httpPost = new HttpPost(payProperties.getCreateOrder());
@@ -177,7 +205,7 @@ public class WxController {
                 return R.error("订单查询失败");
             }
         } catch (Exception e) {
-            log.info("订单查询异常 {}",e.getLocalizedMessage());
+            log.info("订单查询异常 {}", e.getLocalizedMessage());
             return R.error("订单查询异常");
         } finally {
             response.close();
@@ -187,16 +215,16 @@ public class WxController {
 
     @ApiOperation(value = "申请退款")
     @PostMapping("/result/refund")
-    public R refundOrder(@RequestBody Map reqMap){
+    public R refundOrder(@RequestBody Map reqMap) {
         Map map = null;
         String transactionId = (String) reqMap.get("transactionId");
         String outTradeNo = (String) reqMap.get("outTradeNo");
-        if(StringUtils.isEmpty(transactionId)&&StringUtils.isEmpty(outTradeNo)){
+        if (StringUtils.isEmpty(transactionId) && StringUtils.isEmpty(outTradeNo)) {
             return R.error(ResultCode.ERROR, null, "transactionId or outTradeNo为空!");
         }
-        RefundDto refundDto = new RefundDto();
+        com.wx.pay.dto.refund.RefundDto refundDto = new RefundDto();
         refundDto.setTransactionId(null);
-        refundDto.setOutTradeNo(StringUtils.isEmpty(outTradeNo)?null:outTradeNo);
+        refundDto.setOutTradeNo(StringUtils.isEmpty(outTradeNo) ? null : outTradeNo);
         refundDto.setOutRefundNo(RandomUtil.randomString(32).toString().toUpperCase());
         refundDto.setReason("商品没有货物");
         refundDto.setNotifyUrl(payProperties.getRefundOrderNotify());
@@ -222,7 +250,7 @@ public class WxController {
         //退款地址
         String refundOrderUrl = payProperties.getRefundOrder();
         String reqParam = JSON.toJSONString(refundDto);
-        log.info("申请退款请求参数 {}",reqParam);
+        log.info("申请退款请求参数 {}", reqParam);
         HttpPost httpPost = new HttpPost(refundOrderUrl);
         StringEntity entity = new StringEntity(reqParam, "utf-8");
         entity.setContentType("application/json");
@@ -236,11 +264,11 @@ public class WxController {
             response = (CloseableHttpResponse) httpClient.execute(httpPost);
             try {
                 int statusCode = response.getStatusLine().getStatusCode();
-                log.info("申请退款结果 {}",EntityUtils.toString(response.getEntity()));
+                log.info("申请退款结果 {}", EntityUtils.toString(response.getEntity()));
                 if (statusCode == 200) {
-                    log.info("申请退款结果成功 {}",EntityUtils.toString(response.getEntity()));
+                    log.info("申请退款结果成功 {}", EntityUtils.toString(response.getEntity()));
                     String res = EntityUtils.toString(response.getEntity());
-                    map = JSONObject.parseObject(res,Map.class);
+                    map = JSONObject.parseObject(res, Map.class);
                 } else if (statusCode == 204) {
                     System.out.println("success");
                 } else {
@@ -254,7 +282,7 @@ public class WxController {
             return R.error(ResultCode.ERROR, null, e.getLocalizedMessage());
         }
         String status = (String) map.get("status");
-        if(!"SUCCESS".equals(status)){
+        if (!"SUCCESS".equals(status)) {
             return R.error(ResultCode.ERROR, null, "订单申请失败");
         }
         return R.ok("订单申请退款成功", map);
@@ -263,7 +291,7 @@ public class WxController {
 
     @ApiOperation(value = "退款通知")
     @PostMapping("/result/refund-notify")
-    public Map refundOrderNotify(@RequestBody Map map){
+    public Map refundOrderNotify(@RequestBody Map map) {
         Map result = new HashMap();
         RefundNotifyDto refundNotifyDto = JSONObject.parseObject(JSON.toJSONString(map), RefundNotifyDto.class);
         if (ObjectUtil.isEmpty(refundNotifyDto)) {
@@ -298,7 +326,7 @@ public class WxController {
             result.put("code", "FAIL");
             result.put("message", "通知失败,refund_status为空!");
             return result;
-        }else if(!"SUCCESS".equals(refund_status)){
+        } else if (!"SUCCESS".equals(refund_status)) {
             result.put("code", "FAIL");
             result.put("message", "通知失败!");
             return result;
@@ -311,10 +339,10 @@ public class WxController {
     @ApiOperation(value = "查询单笔退款")
     @PostMapping("/result/queryRefundResult")
     public Map queryRefundResult(String outRefundNo) throws IOException {
-        if(StringUtils.isEmpty(outRefundNo)){
+        if (StringUtils.isEmpty(outRefundNo)) {
             return R.error("outRefundNo 为空");
         }
-        String refundQueryUrl = payProperties.getRefundQuery().replaceAll("\\{out-refund-no}","");
+        String refundQueryUrl = payProperties.getRefundQuery().replaceAll("\\{out-refund-no}", "");
         StringBuilder stringBuilder = new StringBuilder(refundQueryUrl);
         stringBuilder.append(outRefundNo);
 
@@ -352,16 +380,16 @@ public class WxController {
     @ApiOperation(value = "申请交易账单查询")
     @PostMapping("/result/applyTradebill")
     public Map applyTradebill(ApplyTradeDto applyTradeDto) throws IOException {
-        if(StringUtils.isEmpty(applyTradeDto)){
+        if (StringUtils.isEmpty(applyTradeDto)) {
             return R.error("参数为空");
         }
 
-        if(StringUtils.isEmpty(applyTradeDto.getBillDate())){
+        if (StringUtils.isEmpty(applyTradeDto.getBillDate())) {
             return R.error("bill_date 为空");
         }
         String applyTradebillUrl = payProperties.getApplyTradebill();
         StringBuilder stringBuilder = new StringBuilder(applyTradebillUrl);
-        stringBuilder.append("?bill_date="+applyTradeDto.getBillDate());
+        stringBuilder.append("?bill_date=" + applyTradeDto.getBillDate());
         stringBuilder.append("&bill_type=ALL");
         stringBuilder.append("&tar_type=GZIP");
 
@@ -398,17 +426,17 @@ public class WxController {
     @ApiOperation(value = "申请资金账单查询")
     @PostMapping("/result/applyFundbill")
     public Map applyFundbill(ApplyTradeDto applyTradeDto) throws IOException {
-        if(StringUtils.isEmpty(applyTradeDto)){
+        if (StringUtils.isEmpty(applyTradeDto)) {
             return R.error("参数为空");
         }
-        if(StringUtils.isEmpty(applyTradeDto.getBillDate())){
+        if (StringUtils.isEmpty(applyTradeDto.getBillDate())) {
             return R.error("bill_date 为空");
         }
         String applyTradebillUrl = payProperties.getApplyFundbill();
         StringBuilder stringBuilder = new StringBuilder(applyTradebillUrl);
-        stringBuilder.append("?bill_date="+applyTradeDto.getBillDate());
+        stringBuilder.append("?bill_date=" + applyTradeDto.getBillDate());
         stringBuilder.append("&account_type=BASIC");
-        stringBuilder.append("&tar_type=GZIP");
+        stringBuilder.append("&tar_type=" + applyTradeDto.getTarType());
 
         HttpGet httpGet = new HttpGet(stringBuilder.toString());
         StringEntity entity = new StringEntity("", "UTF-8");
@@ -442,41 +470,53 @@ public class WxController {
 
 
     @ApiOperation(value = "下载账单")
-    @PostMapping("/result/downloadBill")
-    public Map downloadBill(String downloadUrl) throws IOException, SignatureException, NoSuchAlgorithmException, InvalidKeyException {
-        if(StringUtils.isEmpty(downloadUrl)){
-            return R.error("下载地址为空");
-        }
-        HttpGet httpGet2 = new HttpGet(downloadUrl);
-        httpGet2.setHeader("Authorization","WECHATPAY2-SHA256-RSA2048 mchid="+payProperties.getMchId());
-        httpGet2.setHeader("nonce_str",payProperties.getMchSerialno());
+    @GetMapping("/result/downloadBill")
+    public void downloadBill(String downloadUrl, HttpServletResponse httpResponse) throws IOException, SignatureException, NoSuchAlgorithmException, InvalidKeyException {
         String nonceStr = RandomUtil.randomString(32);
-        httpGet2.setHeader("signature", RSAUtil.getToken2(downloadUrl,nonceStr));
+        HttpGet httpGet = new HttpGet(downloadUrl);
+        httpGet.setHeader("Accept", "application/json");
         //请求下载地址
-        CloseableHttpResponse response=null;
+        CloseableHttpResponse response = null;
         try {
-            response = (CloseableHttpResponse) httpClient.execute(httpGet2);
-            String fileName = response.getHeaders("Content-Disposition")[0].getValue().split("filename=")[1];
-            log.info("文件名为" + fileName);
-
-            if (response.getStatusLine().getStatusCode() == 200) {
-                //得到实体
-                HttpEntity entity3 = response.getEntity();
-                byte[] data = EntityUtils.toByteArray(entity3);
-                //存入磁盘
-                FileOutputStream fos = new FileOutputStream(fileName);
-                fos.write(data);
-                fos.close();
-                log.info("文件下载成功！");
+            CloseableHttpClient httpClient = wechatPayHttpClientBuilder.build();
+            response = httpClient.execute(httpGet);
+            HttpEntity entity = response.getEntity();
+            if (!ObjectUtil.isEmpty(entity)) {
+                FileUtil.writeFile(httpResponse,response.getEntity().getContent());
+//
+//                setExcelRespProp(httpResponse, "交易账单");
+//                 String bodyAsString = EntityUtils.toString(entity);
+//                log.info("result is {}",bodyAsString);
+//                if(bodyAsString.contains("INVALID_REQUEST")){
+//                    httpResponse.getWriter().write(JSON.toJSONString(R.error("文件下载失败")));
+//                    return;
+//                }
+//                List<Map> list = JSON.parseArray(bodyAsString, Map.class);
+//                List<BillExcelDto> billExcelDtoList = null;
+//                EasyExcel.write(httpResponse.getOutputStream())
+//                        .head(BillExcelDto.class)
+//                        .excelType(ExcelTypeEnum.XLSX)
+//                        .sheet("交易账单")
+//                        .doWrite(billExcelDtoList);
             } else {
-                return R.ok("文件下载失败！Http状态码为" + response.getStatusLine().getStatusCode(),null);
+                httpResponse.getWriter().write(JSON.toJSONString(R.error("文件下载失败")));
             }
         } catch (Exception e) {
             log.info("文件下载失败 {}", e.getLocalizedMessage());
-            return R.error("文件下载失败");
+            httpResponse.getWriter().write(JSON.toJSONString(R.error("文件下载失败")));
         } finally {
             response.close();
         }
-        return R.ok("下载成功",null);
     }
+
+
+    private void setExcelRespProp(HttpServletResponse response, String rawFileName) throws UnsupportedEncodingException {
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setCharacterEncoding("utf-8");
+        String fileName = URLEncoder.encode(rawFileName, "UTF-8").replaceAll("\\+", "%20");
+        response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
+    }
+
+
+
 }
