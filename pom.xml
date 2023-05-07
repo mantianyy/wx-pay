@@ -11,8 +11,12 @@
     <groupId>com.wx</groupId>
     <artifactId>wx.pay</artifactId>
     <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
     <name>we-pay</name>
     <description>we-pay</description>
+    <modules>
+        <module>pay-integration</module>
+    </modules>
     <properties>
         <java.version>1.8</java.version>
     </properties>
