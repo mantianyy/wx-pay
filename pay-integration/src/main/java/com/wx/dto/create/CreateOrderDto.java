@@ -13,11 +13,11 @@ import java.util.List;
  * @author jiang漫天
  */
 @Data
-@ApiModel("关闭订单接口参数模型")
+@ApiModel("创建订单接口参数模型")
 public class CreateOrderDto {
 
     @Data
-    static class Amount {
+    public static class Amount {
         @JSONField(name = "total")
         private Integer total;
         @JSONField(name = "currency")
@@ -25,14 +25,14 @@ public class CreateOrderDto {
     }
 
     @Data
-    static class Payer {
+    public static class Payer {
         @ApiModelProperty("支付者")
         @JSONField(name = "openid")
         private String openId;
     }
 
     @Data
-    static class Detail {
+    public static class Detail {
         @Data
         static class GoodsDetail {
             @ApiModelProperty("商户侧商品编码")
@@ -64,7 +64,7 @@ public class CreateOrderDto {
     }
 
     @Data
-    static class SceneInfo {
+    public static class SceneInfo {
         @Data
         static class StoreInfo {
             @ApiModelProperty("门店编号")
@@ -93,11 +93,15 @@ public class CreateOrderDto {
     }
 
     @Data
-    static class SettleInfo {
+    public static class SettleInfo {
         @ApiModelProperty("是否指定分账")
         @JSONField(name = "profit_sharing")
         private Boolean profitSharing;
     }
+
+    @ApiModelProperty("微信openid")
+    @JSONField(name = "openid")
+    private String openId;
 
     @ApiModelProperty("应用ID")
     @JSONField(name = "appid")

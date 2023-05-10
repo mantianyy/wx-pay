@@ -27,27 +27,6 @@ public class RefundResultNotificationDto {
     @JSONField(name = "resource")
     private Resource resource;
 
-    @Data
-    @ApiModel("退款结果通知入参模型")
-    static class Resource{
-        @ApiModelProperty("加密算法类型")
-        @JSONField(name = "algorithm")
-        private String algorithm;
-        @ApiModelProperty("加密前的对象类型")
-        @JSONField(name = "original_type")
-        private String original_type;
-        @ApiModelProperty("数据密文")
-        @JSONField(name = "ciphertext")
-        private String ciphertext;
-        @ApiModelProperty("附加数据")
-        @JSONField(name = "associated_data")
-        private String associated_data;
-        @ApiModelProperty("随机串")
-        @JSONField(name = "nonce")
-        private String nonce;
-    }
-
-
     @ApiModelProperty("商户退款单号")
     @JSONField(name = "mchid")
     private String mchId;
@@ -73,9 +52,31 @@ public class RefundResultNotificationDto {
     @JSONField(name = "amount")
     private Amount amount;
 
+
+    @Data
+    @ApiModel("退款结果通知入参模型")
+    class Resource{
+        @ApiModelProperty("加密算法类型")
+        @JSONField(name = "algorithm")
+        private String algorithm;
+        @ApiModelProperty("加密前的对象类型")
+        @JSONField(name = "original_type")
+        private String original_type;
+        @ApiModelProperty("数据密文")
+        @JSONField(name = "ciphertext")
+        private String ciphertext;
+        @ApiModelProperty("附加数据")
+        @JSONField(name = "associated_data")
+        private String associated_data;
+        @ApiModelProperty("随机串")
+        @JSONField(name = "nonce")
+        private String nonce;
+    }
+
+
     @Data
     @ApiModel("金额信息")
-    static class Amount {
+    class Amount {
         @ApiModelProperty("商户退款单号")
         @JSONField(name = "total")
         private Integer total;

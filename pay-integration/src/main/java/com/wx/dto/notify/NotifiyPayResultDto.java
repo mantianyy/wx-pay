@@ -51,9 +51,10 @@ public class NotifiyPayResultDto {
     private SceneInfo sceneInfo;
     @ApiModelProperty("优惠功能")
     @JSONField(name = "promotion_detail")
-    private PromotionDetail promotionDetail;
+    private List<PromotionDetail> promotionDetail;
 
     @ApiModel("订单金额")
+    @Data
     static class Payer {
         @ApiModelProperty("用户标识")
         @JSONField(name = "openid")
@@ -61,6 +62,7 @@ public class NotifiyPayResultDto {
     }
 
     @ApiModel("订单金额")
+    @Data
     static class Amount {
         @ApiModelProperty("总金额")
         @JSONField(name = "total")
@@ -77,6 +79,7 @@ public class NotifiyPayResultDto {
     }
 
     @ApiModel("场景信息")
+    @Data
     static class SceneInfo {
         @ApiModelProperty("商户端设备号")
         @JSONField(name = "device_id")
@@ -84,6 +87,7 @@ public class NotifiyPayResultDto {
     }
 
     @ApiModel("优惠功能")
+    @Data
     static class PromotionDetail {
         @ApiModelProperty("券ID")
         @JSONField(name = "coupon_id")
@@ -120,6 +124,7 @@ public class NotifiyPayResultDto {
         private List<GoodsDetail> goodsDetails;
 
         @ApiModel("单品列表")
+        @Data
         static class GoodsDetail {
             @ApiModelProperty("商品编码")
             @JSONField(name = "goods_id")

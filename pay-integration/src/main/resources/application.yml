@@ -1,0 +1,58 @@
+server:
+  tomcat:
+    uri-encoding: UTF-8
+    threads:
+      max: 200
+      min-spare: 30
+    connection-timeout: 5000ms
+  port: 8089
+  servlet:
+    context-path: /pay-integration
+
+
+spring:
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+
+#配置日志
+logging:
+  level:
+    root: info
+    com.emos.wx.db.dao : warn
+  pattern:
+    console: "%d{HH:mm:ss}  %-5level  %msg%n"
+
+
+wx:
+  cert: cert/apiclient_key.pem
+  private-key:
+  mch-id: 1641770912
+  mch-serialno: 670CFBD729DE9AC29CA51886E11F0B2A0956B69D
+  api-v3-Key: 45CFE5C7DBF247918146DDDD7139D1CE
+  #微信下单
+  create-order: https://api.mch.weixin.qq.com/v3/pay/transactions/jsapi
+  #微信支付回调通知
+  pay_order_notify: https://gt45587346.zicp.fun/wx-pay/create/result/notify
+  #查询订单
+  query-order: https://api.mch.weixin.qq.com/v3/pay/transactions/id/
+  #关闭订单
+  close-order: https://api.mch.weixin.qq.com/v3/pay/transactions/out-trade-no/{out-trade-no}/close
+  #申请退款
+  refund-order: https://api.mch.weixin.qq.com/v3/refund/domestic/refunds
+  #微信退款回调通知
+  refund_order_notify: https://gt45587346.zicp.fun/wx-pay/create/result/refund-notify
+  #查询单笔退款
+  refund-query: https://api.mch.weixin.qq.com/v3/refund/domestic/refunds/{out-refund-no}
+  #申请交易账单
+  apply-tradebill: https://api.mch.weixin.qq.com/v3/bill/tradebill
+  #申请资金账单
+  apply-fundbill: https://api.mch.weixin.qq.com/v3/bill/tradebill
+  #下载账单
+  download-bill: https://api.mch.weixin.qq.com/v3/bill/fundflowbill
+  open-id: oUYWT5AvRQgX1Z9prDMqXrwYY_wk
+  app-id: wx6f8b36de02f6af65
+  secret: f2054aa12404c43094e4b541b3d4426d
+
+

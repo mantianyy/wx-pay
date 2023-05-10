@@ -11,5 +11,5 @@ public class QuerySingleRefundDto {
 
     @ApiModelProperty("商户退款单号")
     @JSONField(name = "out_refund_no")
-   private String outRefundNo;
+    private String outRefundNo;
 }
