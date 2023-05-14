@@ -22,7 +22,8 @@ public enum ResultCode {
     USER_UPLOAD_FAILED(2007, "上传失败!"),
     USER_DOWNLOAD_SUCCESS(2008,"下载成功!"),
     USER_DOWNLOAD_FAILED(2009,"下载失败!"),
-    WORKFLOW_SUCCESS(200,"审批成功!");
+    WORKFLOW_SUCCESS(200,"审批成功!"),
+    FAIL(3001, "FAIL");
 
     private int status;
     private String desc;

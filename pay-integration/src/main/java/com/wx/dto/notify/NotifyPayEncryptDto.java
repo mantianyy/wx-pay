@@ -28,7 +28,7 @@ public class NotifyPayEncryptDto {
     private Resource resource;
 
     @Data
-    static class Resource{
+    public static class Resource{
         @ApiModelProperty("原始类型")
         @JSONField(name = "original_type")
         private String original_type;

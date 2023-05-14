@@ -1,9 +1,11 @@
 package com.wx.controller;
 
+import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.wechat.pay.contrib.apache.httpclient.util.AesUtil;
+import com.wx.common.CurrencyEnum;
 import com.wx.common.R;
 import com.wx.common.ResultCode;
 import com.wx.dto.apply.AppleFundBillDto;
@@ -11,19 +13,27 @@ import com.wx.dto.apply.AppleTradeBillDto;
 import com.wx.dto.apply.ApplyRefundDto;
 import com.wx.dto.create.CreateOrderDto;
 import com.wx.dto.notify.NotifiyPayResultDto;
+import com.wx.dto.notify.NotifyPayEncryptDto;
 import com.wx.dto.query.MerchantOrderQueryDto;
 import com.wx.dto.query.PayOrderQueryDto;
 import com.wx.dto.query.QuerySingleRefundDto;
 import com.wx.dto.refund.RefundResultNotificationDto;
+import com.wx.dto.sign.SignDto;
+import com.wx.dto.wx.dto.AmountDto;
+import com.wx.dto.wx.dto.PayerDto;
+import com.wx.dto.wx.dto.ResourceDto;
 import com.wx.properties.PayProperties;
+import com.wx.util.RSAUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
+import org.apache.http.util.ExceptionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,8 +68,8 @@ public class PayController {
 
     @PostMapping(value = "/payNotify")
     @ApiOperation(value = "2.支付通知")
-    public R payNotify(@RequestBody NotifiyPayResultDto notifiyPayResultDto) {
-        return payNotifyProcess(notifiyPayResultDto);
+    public Map payNotify(@RequestBody NotifyPayEncryptDto notifyPayEncryptDto) {
+        return payNotifyProcess(notifyPayEncryptDto);
     }
 
     @PostMapping(value = "/payOrderQuery")
@@ -114,33 +124,74 @@ public class PayController {
         return null;
     }
 
+    @PostMapping(value = "/sign")
+    @ApiOperation(value = "10.获取签名")
+    public R getSign(@RequestBody SignDto signDto){
+        Map resMap;
+        if(ObjectUtil.isEmpty(signDto)){
+            return R.error("参数为空");
+        }
+
+        if(StringUtils.isEmpty(signDto.getSignType())){
+            return R.error("sign_type must not empty");
+        }
+
+        if(StringUtils.isEmpty(signDto.getValue())){
+            return R.error("value must not empty");
+        }
+        try{
+            if(signDto.getSignType().equals("0")){
+                resMap = RSAUtil.getSignByDownloadUrl(signDto.getValue(),payProperties);
+            }else{
+                resMap = RSAUtil.getSignByPrePayId(signDto.getValue(),payProperties);
+            }
+        }catch (Exception e){
+            String errorMsg = ExceptionUtil.getMessage(e);
+            log.info("getSign error is {}", errorMsg);
+            return R.error(errorMsg);
+        }
+        return R.ok(resMap);
+    }
 
     private R createOrderProcess(CreateOrderDto createOrderDto) {
-        if (StringUtils.isEmpty(createOrderDto.getOpenId())) {
-            return R.error(ResultCode.ERROR, null, "openid为空");
+        if(ObjectUtil.isEmpty(createOrderDto)){
+            return R.error("参数不能为空!");
+        }
+
+        if(ObjectUtil.isEmpty(createOrderDto.getPayer())){
+            return R.error("payer不能为空!");
         }
         HttpPost httpPost = new HttpPost(payProperties.getCreateOrder());
-        createOrderDto.setAppId(payProperties.getAppId());
-        createOrderDto.setMchId(payProperties.getMchId());
-        String outTradeNo = UUID.randomUUID().toString().replaceAll("-", "").toUpperCase();
-        createOrderDto.setOutTradeNo(outTradeNo);
-        createOrderDto.setDescription("Image形象店-深圳腾大-QQ公仔");
-        createOrderDto.setNotifyUrl(payProperties.getPayOrderNotify());
-        //1.订单金额信息
-        CreateOrderDto.Amount amountDto = new CreateOrderDto.Amount();
-        amountDto.setCurrency(createOrderDto.getAmount().getCurrency());
-        amountDto.setTotal(createOrderDto.getAmount().getTotal());
-        createOrderDto.setAmount(amountDto);
-        //2.支付者
-        CreateOrderDto.Payer payerDto = new CreateOrderDto.Payer();
-        payerDto.setOpenId(createOrderDto.getOpenId());
-        createOrderDto.setPayer(payerDto);
+//        createOrderDto.setOpenId(payProperties.getOpenId());
+//        createOrderDto.setAppId(payProperties.getAppId());
+//        createOrderDto.setMchId(payProperties.getMchId());
+//        String outTradeNo = UUID.randomUUID().toString().replaceAll("-", "").toUpperCase();
+//        createOrderDto.setOutTradeNo(outTradeNo);
+//        createOrderDto.setNotifyUrl(payProperties.getPayOrderNotify());
 
-        String reqParma = JSONObject.toJSONString(createOrderDto);
+        com.wx.dto.wx.dto.CreateOrderDto createOrderDto1 = new com.wx.dto.wx.dto.CreateOrderDto();
+        createOrderDto1.setAppId(payProperties.getAppId());
+        createOrderDto1.setMchId(payProperties.getMchId());
+        String outTradeNo = UUID.randomUUID().
+                toString().replaceAll("-", "").toUpperCase();
+        createOrderDto1.setOutTradeNo(outTradeNo);
+        createOrderDto1.setDesc("Image形象店-深圳腾大-QQ公仔");
+        createOrderDto1.setNotifyUrl(payProperties.getPayOrderNotify());
+
+        com.wx.dto.wx.dto.AmountDto amountDto = new com.wx.dto.wx.dto.AmountDto();
+        amountDto.setCurrency(CurrencyEnum.CNY);
+        amountDto.setTotal(1);
+        createOrderDto1.setAmountDto(amountDto);
+        PayerDto payerDto = new PayerDto();
+        payerDto.setOpenId("oUYWT5AvRQgX1Z9prDMqXrwYY_wk");
+        createOrderDto1.setPayerDto(payerDto);
+
+        String reqParma = JSONObject.toJSONString(createOrderDto1);
         StringEntity entity = new StringEntity(reqParma, "utf-8");
         entity.setContentType("application/json");
         httpPost.setEntity(entity);
         httpPost.setHeader("Accept", "application/json");
+
         //2.请求地址
         CloseableHttpResponse response = null;
         try {
@@ -150,7 +201,7 @@ public class PayController {
                 int statusCode = response.getStatusLine().getStatusCode();
                 if (statusCode == 200) {
                     log.info("success,return body = " + EntityUtils.toString(response.getEntity()));
-                    return R.ok("下单成功", null);
+                    return R.ok("下单成功", EntityUtils.toString(response.getEntity()));
                 } else if (statusCode == 204) {
                     log.info("success");
                     return R.ok("下单异常", null);
@@ -167,12 +218,96 @@ public class PayController {
         }
     }
 
-    private R payOrderQueryProcess(PayOrderQueryDto payOrderQueryDto) {return null;}
+    private R payOrderQueryProcess(PayOrderQueryDto payOrderQueryDto) {
+        if(ObjectUtil.isEmpty(payOrderQueryDto)){
+            return R.error("参数为空");
+        }
+        if(StringUtils.isEmpty(payOrderQueryDto.getTransactionId())){
+            return R.error("transactionId 为空!");
+        }
+        String result = null;
+        String url = payProperties.getQueryOrder();
+        StringBuilder stringBuilder = new StringBuilder(url);
+        stringBuilder.append(payOrderQueryDto.getTransactionId());
+        stringBuilder.append("?mchid=" + payProperties.getMchId());
+        HttpGet httpGet = new HttpGet(stringBuilder.toString());
+        StringEntity entity = new StringEntity("", "UTF-8");
+        entity.setContentType("application/json");
+        httpGet.setHeader("Accept", "application/json");
+        //完成签名并执行请求
+        CloseableHttpResponse response=null;
+        try {
+            response = (CloseableHttpResponse) httpClient.execute(httpGet);
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode == 200) {
+                System.out.println("success,return body = " + EntityUtils.toString(response.getEntity()));
+                //解析prepay_id
+                result = EntityUtils.toString(response.getEntity());
+            } else if (statusCode == 204) {
+                System.out.println("success");
+            } else {
+                System.out.println("failed,resp code = " + statusCode + ",return body = " + EntityUtils.toString(response.getEntity()));
+                return R.error("订单查询失败");
+            }
+        } catch (Exception e) {
+            log.info("订单查询异常 {}", e.getLocalizedMessage());
+            return R.error("订单查询异常");
+        } finally {
+            try {
+                response.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return R.ok(JSON.parseObject(result));
+    }
 
     private R merchantOrderQueryProcess(MerchantOrderQueryDto merchantOrderQueryDto) {return null;}
 
-    private R payNotifyProcess(NotifiyPayResultDto notifiyPayResultDto) {
-       return null;
+    private Map payNotifyProcess(NotifyPayEncryptDto notifyPayEncryptDto) {
+        Map result = new HashMap();
+
+        if (ObjectUtil.isEmpty(notifyPayEncryptDto)) {
+            result.put("code", "FAIL");
+            result.put("message", "参数传递异常!");
+            return result;
+        }
+        NotifyPayEncryptDto.Resource resourceDto = notifyPayEncryptDto.getResource();
+        if (ObjectUtil.isEmpty(resourceDto)) {
+            result.put("code", "FAIL");
+            result.put("message", "参数传递异常!");
+            return result;
+        }
+        //解密信息
+        String algorithm = resourceDto.getAlgorithm();
+        String ciphertext = resourceDto.getCipherText();
+        String associatedData = resourceDto.getAssociatedData();
+        String nonce = resourceDto.getNonce();
+        String res = null;
+        try {
+            res = new AesUtil(payProperties.getApiV3Key().getBytes(StandardCharsets.UTF_8))
+                    .decryptToString(associatedData.getBytes(StandardCharsets.UTF_8),
+                            nonce.getBytes(StandardCharsets.UTF_8),
+                            ciphertext);
+        } catch (Exception e) {
+            log.info("解密失敗 result {}", e.getLocalizedMessage());
+        }
+
+        if (res == null) {
+            result.put("code", "FAIL");
+            result.put("message", "通知失败,解密信息异常!");
+            return result;
+        }
+        Map resMap = JSONObject.parseObject(res, Map.class);
+        String transactionId = (String) resMap.get("transaction_id");
+        if (StringUtils.isEmpty(transactionId)) {
+            result.put("code", "FAIL");
+            result.put("message", "通知失败,transaction_id为空!");
+            return result;
+        }
+        result.put("code", "SUCCESS");
+        result.put("message", "成功!");
+        return result;
     }
 
     private R applyRefundProcess(ApplyRefundDto applyRefundDto) {return null;}
@@ -188,6 +323,8 @@ public class PayController {
     private Map downloadBillProcess(Map map){
         return null;
     }
+
+
 
 
 }

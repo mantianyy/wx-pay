@@ -54,11 +54,12 @@ Page({
       wx.requestPayment
       (
           {
-              "timeStamp": "1681724711",
-              "nonceStr": "akg8kc7nqcsqgs3hpd256bpokwyor1mw",
-              "package": "prepay_id=wx171745091790433084432b979c66600000",
+              "timeStamp": "1684077111",
+              "nonceStr": "a0dkuvbc8pgasthl8unsa9x33ylc91eh",
+              "package": "prepay_id=wx14231122581781f65eba40f783991c0000",
               "signType": "RSA",
-              "paySign": "Jr4YDu8ikcn8vAnZI+SMOB74g9Lt8JJ2YvBlJI7HgMNrRmU29e8rhQo+hGC6z5hS3fW8+28+c/cmMZVKFT7C/VbH+yfM4yaRNQlPp39eu1Wnkyke0guOnBShHTo0CQEmRValVMfiqL5MCQTSegOIDL7/GHzHxUo1x65QWKF9g/alkrb6P1+mOq41tlIUeLVYlu6Zu/KZa8RHhuyrEiAIyXImbjm0UySPdyH1bdA4YUH2hZmikv+YW4CN+B6bwRGrWHBUO1eLikxQWteWwE47Z9uQCADn/InOgCF3dIz9EsOOKawAu07phGh9ZY88vChyQ4C+Q8v31VqHgmWb2mP8yw==",
+              "paySign": "obj5j8eG0sMZx5hNZNcns5wTydftOPybFg0YxvhXqtsbQPzTkRQJ42obAuFfFvksEEwmhIIWae60pbHoUC0+JRjO5xNgj60g8JXaJ8pE0z8SafmFzitDEsFDY8QbPtUmZo9bci6YQoGmWeWzpXz1FOyMJ8Lbs93CskCzwC2rmZjDchwrxaDa9FMc7e0vlWzButr1hjqBc/SQZZx1NzUBig8E0y24flhcDhPSiJ+sFuhW647J1H/8oYqus1x5Xl1S4fp3VSBRgkxV0u1qrtF7b3+PcfKVAKzB7u/ejxEyQN31TeVTEC3Qu74YT//0uuiyalRbDGa1Q0kwId02QJPkEA==",
+              "serial_no": "670CFBD729DE9AC29CA51886E11F0B2A0956B69D",
               "success":function(res){
                   console.log("预下单成功",res)
               },
