@@ -89,7 +89,7 @@ public class PayController {
 
     @PostMapping(value = "/refundResultNotify")
     @ApiOperation(value = "5.退款结果通知")
-    public R refundResultNotify(@RequestBody RefundResultNotificationEncryptDto refundResultNotificationEncryptDto) {
+    public Map refundResultNotify(@RequestBody RefundResultNotificationEncryptDto refundResultNotificationEncryptDto) {
         return refundResultNotifyProcess(refundResultNotificationEncryptDto);
     }
 
@@ -347,7 +347,8 @@ public class PayController {
     }
 
     private R applyRefundProcess(ApplyRefundDto applyRefundDto) {
-        Map map = null;
+        Map result = new HashMap();
+        Map map = new HashMap();
         if(ObjectUtil.isEmpty(applyRefundDto)){
             return R.error("参数为空");
         }
@@ -401,8 +402,49 @@ public class PayController {
 
     private R querySingleRefundProcess(QuerySingleRefundDto querySingleRefundDto) {return null;}
 
-    private R refundResultNotifyProcess(RefundResultNotificationEncryptDto refundResultNotificationEncryptDto) {
-        return null;
+    private Map refundResultNotifyProcess(RefundResultNotificationEncryptDto refundResultNotificationEncryptDto) {
+        Map result = new HashMap();
+
+        if (ObjectUtil.isEmpty(refundResultNotificationEncryptDto)) {
+            return R.error(ResultCode.ERROR, "退款通知参数异常", null);
+        }
+        RefundResultNotificationEncryptDto.Resource resource = refundResultNotificationEncryptDto.getResource();
+        if (ObjectUtil.isEmpty(resource)) {
+            return R.error(ResultCode.ERROR, "退款通知情信息异常", null);
+        }
+        //解密信息
+        String ciphertext = resource.getCiphertext();
+        String associatedData = resource.getAssociated_data();
+        String nonce = resource.getNonce();
+        String res = null;
+        try {
+            res = new AesUtil(payProperties.getApiV3Key().getBytes(StandardCharsets.UTF_8))
+                    .decryptToString(associatedData.getBytes(StandardCharsets.UTF_8),
+                            nonce.getBytes(StandardCharsets.UTF_8),
+                            ciphertext);
+        } catch (Exception e) {
+            log.info("解密失敗 result {}", e.getLocalizedMessage());
+        }
+
+        if (res == null) {
+            result.put("code", "FAIL");
+            result.put("message", "通知失败,解密信息异常!");
+            return result;
+        }
+        Map resMap = JSONObject.parseObject(res, Map.class);
+        String refund_status = (String) resMap.get("refund_status");
+        if (StringUtils.isEmpty(refund_status)) {
+            result.put("code", "FAIL");
+            result.put("message", "通知失败,refund_status为空!");
+            return result;
+        } else if (!"SUCCESS".equals(refund_status)) {
+            result.put("code", "FAIL");
+            result.put("message", "通知失败!");
+            return result;
+        }
+        result.put("code", "SUCCESS");
+        result.put("message", "退款成功!");
+        return result;
     }
 
     private R applyTransactionBillProcess(AppleFundBillDto appleFundBillDto){return null;}

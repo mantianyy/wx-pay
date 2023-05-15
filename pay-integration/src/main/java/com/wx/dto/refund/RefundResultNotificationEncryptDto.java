@@ -31,7 +31,7 @@ public class RefundResultNotificationEncryptDto {
 
     @Data
     @ApiModel("退款结果通知入参模型")
-    class Resource{
+    public static class Resource{
         @ApiModelProperty("加密算法类型")
         @JSONField(name = "algorithm")
         private String algorithm;
@@ -43,28 +43,12 @@ public class RefundResultNotificationEncryptDto {
         private String ciphertext;
         @ApiModelProperty("附加数据")
         @JSONField(name = "associated_data")
-        private String associatedData;
+        private String associated_data;
         @ApiModelProperty("随机串")
         @JSONField(name = "nonce")
         private String nonce;
     }
 
 
-    @Data
-    @ApiModel("金额信息")
-    class Amount {
-        @ApiModelProperty("商户退款单号")
-        @JSONField(name = "total")
-        private Integer total;
-        @ApiModelProperty("商户退款单号")
-        @JSONField(name = "refund")
-        private Integer refund;
-        @ApiModelProperty("商户退款单号")
-        @JSONField(name = "payer_total")
-        private Integer payerTotal;
-        @ApiModelProperty("商户退款单号")
-        @JSONField(name = "payer_refund")
-        private Integer payerRefund;
-    }
 
 }
