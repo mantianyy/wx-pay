@@ -3,12 +3,16 @@ package com.wx.controller;
 import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.RandomUtil;
+import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.support.ExcelTypeEnum;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.wechat.pay.contrib.apache.httpclient.WechatPayHttpClientBuilder;
 import com.wechat.pay.contrib.apache.httpclient.util.AesUtil;
 import com.wx.common.CurrencyEnum;
 import com.wx.common.R;
 import com.wx.common.ResultCode;
+import com.wx.common.TransactionBillEnum;
 import com.wx.dto.apply.AppleFundBillDto;
 import com.wx.dto.apply.AppleTradeBillDto;
 import com.wx.dto.apply.ApplyRefundDto;
@@ -20,16 +24,20 @@ import com.wx.dto.query.QuerySingleRefundDto;
 import com.wx.dto.refund.RefundResultNotificationEncryptDto;
 import com.wx.dto.sign.SignDto;
 import com.wx.dto.wx.dto.PayerDto;
+import com.wx.dto.wx.dto.excel.BillExcelDto;
 import com.wx.properties.PayProperties;
 import com.wx.util.RSAUtil;
+import com.wx.util.StreamUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.HttpEntity;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
@@ -39,7 +47,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -53,6 +64,9 @@ public class PayController {
     private PayProperties payProperties;
     @Resource
     private HttpClient httpClient;
+
+    @Resource
+    private WechatPayHttpClientBuilder wechatPayHttpClientBuilder;
 
     @PostMapping(value = "/createOrder")
     @ApiOperation(value = "1.下单")
@@ -102,21 +116,20 @@ public class PayController {
 
     @PostMapping(value = "/applyTransactionBill")
     @ApiOperation(value = "7.申请交易账单")
-    public R applyTransactionBill(@RequestBody AppleFundBillDto appleFundBillDto) {
+    public Map applyTransactionBill(@RequestBody AppleFundBillDto appleFundBillDto) {
         return applyTransactionBillProcess(appleFundBillDto);
     }
 
     @PostMapping(value = "/applyFundBill")
     @ApiOperation(value = "8.申请资金账单")
-    public R applyFundBill(@RequestBody AppleTradeBillDto appleTradeBillDto) {
+    public Map applyFundBill(@RequestBody AppleTradeBillDto appleTradeBillDto) {
         return applyFundBillProcess(appleTradeBillDto);
     }
 
     @PostMapping(value = "/downloadBill")
     @ApiOperation(value = "9.下载账单")
-    public R downloadBill(@RequestBody Map map) {
-        Map res =  downloadBillProcess(map);
-        return null;
+    public void downloadBill(@RequestBody Map map, HttpServletResponse httpResponse) throws IOException {
+        downloadBillProcess(map,httpResponse);
     }
 
     @PostMapping(value = "/sign")
@@ -447,12 +460,158 @@ public class PayController {
         return result;
     }
 
-    private R applyTransactionBillProcess(AppleFundBillDto appleFundBillDto){return null;}
+    private Map applyTransactionBillProcess(AppleFundBillDto appleFundBillDto){
+        if(ObjectUtil.isEmpty(appleFundBillDto)){
+            return R.error("参数为空");
+        }
+        if (StringUtils.isEmpty(appleFundBillDto.getBillDate())) {
+            return R.error("bill_date 为空");
+        }
+        String applyTradebillUrl = payProperties.getApplyTradebill();
+        StringBuilder stringBuilder = new StringBuilder(applyTradebillUrl);
+        stringBuilder.append("?bill_date=" + appleFundBillDto.getBillDate());
+        stringBuilder.append("&bill_type=ALL");
+        stringBuilder.append("&tar_type=GZIP");
 
-    private R applyFundBillProcess(AppleTradeBillDto  appleTradeBillDto){return null;}
+        HttpGet httpGet = new HttpGet(stringBuilder.toString());
+        StringEntity entity = new StringEntity("", "UTF-8");
+        entity.setContentType("application/json");
+        httpGet.setHeader("Accept", "application/json");
 
-    private Map downloadBillProcess(Map map){
-        return null;
+        String jsonRes = null;
+        CloseableHttpResponse response = null;
+        //查询单笔退款信息
+        try {
+            response = (CloseableHttpResponse) httpClient.execute(httpGet);
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode == 200) {
+                System.out.println("success,return body = " + EntityUtils.toString(response.getEntity()));
+                //解析prepay_id
+                jsonRes = EntityUtils.toString(response.getEntity());
+            } else if (statusCode == 204) {
+                System.out.println("success");
+            } else {
+                System.out.println("failed,resp code = " + statusCode + ",return body = " + EntityUtils.toString(response.getEntity()));
+                return R.error("订单查询失败");
+            }
+        } catch (Exception e) {
+            log.info("订单查询异常 {}", e.getLocalizedMessage());
+            return R.error("订单查询异常");
+        } finally {
+            try {
+                response.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return R.ok(JSON.parseObject(jsonRes));
+    }
+
+    private Map applyFundBillProcess(AppleTradeBillDto  appleTradeBillDto){
+        if (ObjectUtil.isEmpty(appleTradeBillDto)) {
+            return R.error("参数为空");
+        }
+        if (StringUtils.isEmpty(appleTradeBillDto.getBillDate())) {
+            return R.error("bill_date 为空");
+        }
+        String applyTradebillUrl = payProperties.getApplyFundbill();
+        StringBuilder stringBuilder = new StringBuilder(applyTradebillUrl);
+        stringBuilder.append("?bill_date=" + appleTradeBillDto.getBillDate());
+        stringBuilder.append("&account_type=BASIC");
+        stringBuilder.append("&tar_type=" + appleTradeBillDto.getTarType());
+
+        HttpGet httpGet = new HttpGet(stringBuilder.toString());
+        StringEntity entity = new StringEntity("", "UTF-8");
+        entity.setContentType("application/json");
+        httpGet.setHeader("Accept", "application/json");
+
+        String jsonRes = null;
+        CloseableHttpResponse response = null;
+        //查询单笔退款信息
+        try {
+            response = (CloseableHttpResponse) httpClient.execute(httpGet);
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode == 200) {
+                System.out.println("success,return body = " + EntityUtils.toString(response.getEntity()));
+                //解析prepay_id
+                jsonRes = EntityUtils.toString(response.getEntity());
+            } else if (statusCode == 204) {
+                System.out.println("success");
+            } else {
+                System.out.println("failed,resp code = " + statusCode + ",return body = " + EntityUtils.toString(response.getEntity()));
+                return R.error("订单查询失败");
+            }
+        } catch (Exception e) {
+            log.info("订单查询异常 {}", e.getLocalizedMessage());
+            return R.error("订单查询异常");
+        } finally {
+            try {
+                response.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return R.ok(JSON.parseObject(jsonRes));
+    }
+
+    private void downloadBillProcess(Map map,HttpServletResponse httpResponse) throws IOException {
+        String downloadUrl = (String) map.get("downloadUrl");
+        if(StringUtils.isEmpty(downloadUrl)){
+            httpResponse.getWriter().write(JSON.toJSONString(R.error("downloadUrl字段缺失")));
+            return;
+        }
+        HttpGet httpGet = new HttpGet(downloadUrl);
+        httpGet.setHeader("Accept", "application/json");
+        //请求下载地址
+        CloseableHttpResponse response = null;
+        try {
+            CloseableHttpClient httpClient = wechatPayHttpClientBuilder.build();
+            response = httpClient.execute(httpGet);
+            HttpEntity entity = response.getEntity();
+            if (!ObjectUtil.isEmpty(entity)) {
+                String fileName = URLEncoder.encode("交易账单", "UTF-8");
+                httpResponse.setContentType("application/vnd.ms-excel");
+                httpResponse.setCharacterEncoding("utf-8");
+                httpResponse.setContentType("application/force-download");
+                httpResponse.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+                httpResponse.setHeader("Content-Disposition", "attachment;filename=" + fileName + ".xlsx");
+                httpResponse.setHeader("Content-Type","application/octet-stream;charset=utf-8");
+                String contentEncoding = entity.getContentType().getValue();
+                InputStream stream = entity.getContent();
+                InputStream inputStream = StreamUtils.getInputStream(stream, contentEncoding);
+                String bodyAsString = StreamUtils.stream2String(inputStream);
+                log.info("result is {}",bodyAsString);
+                if(bodyAsString.contains("INVALID_REQUEST")){
+                    httpResponse.getWriter().write(JSON.toJSONString(R.error("文件下载失败")));
+                    return;
+                }
+                List<String> strings = Arrays.asList(bodyAsString.split("\n"));
+                List<List<String>> dataList = new ArrayList<>();
+                strings.forEach(s->{
+                    List<String> data = Arrays.asList(s.replaceAll("`","").toString().split(","));
+                    final int[] i = {0};
+                    data.forEach(raw->{
+                        String value = TransactionBillEnum.getKey(raw);
+                        data.set(i[0],StringUtils.isEmpty(value)?raw:value);
+                        i[0]++;
+                    });
+                    dataList.add(data);
+                });
+                dataList.remove(0);
+                EasyExcel.write(httpResponse.getOutputStream())
+                        .head(BillExcelDto.class)
+                        .excelType(ExcelTypeEnum.XLSX)
+                        .sheet("交易账单")
+                        .doWrite(dataList);
+            } else {
+                httpResponse.getWriter().write(JSON.toJSONString(R.error("文件下载失败")));
+            }
+        } catch (Exception e) {
+            log.info("文件下载失败 {}", e.getLocalizedMessage());
+            httpResponse.getWriter().write(JSON.toJSONString(R.error("文件下载失败")));
+        } finally {
+            response.close();
+        }
     }
 
 
