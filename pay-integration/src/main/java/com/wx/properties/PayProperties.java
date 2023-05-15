@@ -37,6 +37,10 @@ public class PayProperties {
      **/
     private String queryOrder;
     /**
+     * 查询商户订单
+     */
+    private String queryMerchantOrder;
+    /**
      * 关闭订单
      **/
     private String closeOrder;

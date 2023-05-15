@@ -2,6 +2,7 @@ package com.wx.controller;
 
 import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.RandomUtil;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.wechat.pay.contrib.apache.httpclient.util.AesUtil;
@@ -12,16 +13,13 @@ import com.wx.dto.apply.AppleFundBillDto;
 import com.wx.dto.apply.AppleTradeBillDto;
 import com.wx.dto.apply.ApplyRefundDto;
 import com.wx.dto.create.CreateOrderDto;
-import com.wx.dto.notify.NotifiyPayResultDto;
 import com.wx.dto.notify.NotifyPayEncryptDto;
 import com.wx.dto.query.MerchantOrderQueryDto;
 import com.wx.dto.query.PayOrderQueryDto;
 import com.wx.dto.query.QuerySingleRefundDto;
-import com.wx.dto.refund.RefundResultNotificationDto;
+import com.wx.dto.refund.RefundResultNotificationEncryptDto;
 import com.wx.dto.sign.SignDto;
-import com.wx.dto.wx.dto.AmountDto;
 import com.wx.dto.wx.dto.PayerDto;
-import com.wx.dto.wx.dto.ResourceDto;
 import com.wx.properties.PayProperties;
 import com.wx.util.RSAUtil;
 import io.swagger.annotations.Api;
@@ -33,7 +31,6 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
-import org.apache.http.util.ExceptionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,9 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @RestController
 @RequestMapping(value = "/pay")
@@ -94,8 +89,8 @@ public class PayController {
 
     @PostMapping(value = "/refundResultNotify")
     @ApiOperation(value = "5.退款结果通知")
-    public R refundResultNotify(@RequestBody RefundResultNotificationDto refundResultNotificationDto) {
-        return refundResultNotifyProcess(refundResultNotificationDto);
+    public R refundResultNotify(@RequestBody RefundResultNotificationEncryptDto refundResultNotificationEncryptDto) {
+        return refundResultNotifyProcess(refundResultNotificationEncryptDto);
     }
 
     @PostMapping(value = "/querySingleRefund")
@@ -262,11 +257,52 @@ public class PayController {
         return R.ok(JSON.parseObject(result));
     }
 
-    private R merchantOrderQueryProcess(MerchantOrderQueryDto merchantOrderQueryDto) {return null;}
+    private R merchantOrderQueryProcess(MerchantOrderQueryDto merchantOrderQueryDto) {
+        if(ObjectUtil.isEmpty(merchantOrderQueryDto)){
+            return R.error("参数为空");
+        }
+        if(StringUtils.isEmpty(merchantOrderQueryDto.getOutTradeNo())){
+            return R.error("outTradeNo 为空!");
+        }
+        String result = null;
+        String url = payProperties.getQueryOrder();
+        StringBuilder stringBuilder = new StringBuilder(url);
+        stringBuilder.append(merchantOrderQueryDto.getOutTradeNo());
+        stringBuilder.append("?mchid=" + payProperties.getMchId());
+        HttpGet httpGet = new HttpGet(stringBuilder.toString());
+        StringEntity entity = new StringEntity("", "UTF-8");
+        entity.setContentType("application/json");
+        httpGet.setHeader("Accept", "application/json");
+        //完成签名并执行请求
+        CloseableHttpResponse response=null;
+        try {
+            response = (CloseableHttpResponse) httpClient.execute(httpGet);
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode == 200) {
+                System.out.println("success,return body = " + EntityUtils.toString(response.getEntity()));
+                //解析prepay_id
+                result = EntityUtils.toString(response.getEntity());
+            } else if (statusCode == 204) {
+                System.out.println("success");
+            } else {
+                System.out.println("failed,resp code = " + statusCode + ",return body = " + EntityUtils.toString(response.getEntity()));
+                return R.error("订单查询失败");
+            }
+        } catch (Exception e) {
+            log.info("订单查询异常 {}", e.getLocalizedMessage());
+            return R.error("订单查询异常");
+        } finally {
+            try {
+                response.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return R.ok(JSON.parseObject(result));
+    }
 
     private Map payNotifyProcess(NotifyPayEncryptDto notifyPayEncryptDto) {
         Map result = new HashMap();
-
         if (ObjectUtil.isEmpty(notifyPayEncryptDto)) {
             result.put("code", "FAIL");
             result.put("message", "参数传递异常!");
@@ -280,8 +316,8 @@ public class PayController {
         }
         //解密信息
         String algorithm = resourceDto.getAlgorithm();
-        String ciphertext = resourceDto.getCipherText();
-        String associatedData = resourceDto.getAssociatedData();
+        String ciphertext = resourceDto.getCiphertext();
+        String associatedData = resourceDto.getAssociated_data();
         String nonce = resourceDto.getNonce();
         String res = null;
         try {
@@ -310,11 +346,64 @@ public class PayController {
         return result;
     }
 
-    private R applyRefundProcess(ApplyRefundDto applyRefundDto) {return null;}
+    private R applyRefundProcess(ApplyRefundDto applyRefundDto) {
+        Map map = null;
+        if(ObjectUtil.isEmpty(applyRefundDto)){
+            return R.error("参数为空");
+        }
+        if(StringUtils.isEmpty(applyRefundDto.getOutTradeNo())){
+            return R.error("商户退款单号参数为空");
+        }
+        applyRefundDto.setOutRefundNo(RandomUtil.randomString(32).toString().toUpperCase());
+        applyRefundDto.setNotifyUrl(payProperties.getRefundOrderNotify());
+        //退款地址
+        String refundOrderUrl = payProperties.getRefundOrder();
+        String reqParam = JSON.toJSONString(applyRefundDto);
+        log.info("申请退款请求参数 {}", reqParam);
+        HttpPost httpPost = new HttpPost(refundOrderUrl);
+        StringEntity entity = new StringEntity(reqParam, "utf-8");
+        entity.setContentType("application/json");
+        httpPost.setEntity(entity);
+        httpPost.setHeader("Accept", "application/json");
+
+        //退款请求
+        CloseableHttpResponse response = null;
+        try {
+            response = (CloseableHttpResponse) httpClient.execute(httpPost);
+            try {
+                int statusCode = response.getStatusLine().getStatusCode();
+                log.info("申请退款结果 {}", EntityUtils.toString(response.getEntity()));
+                if (statusCode == 200) {
+                    log.info("申请退款结果成功 {}", EntityUtils.toString(response.getEntity()));
+                    String res = EntityUtils.toString(response.getEntity());
+                    map = JSONObject.parseObject(res, Map.class);
+
+                    String status = (String) map.get("status");
+                    if (!"SUCCESS".equals(status)) {
+                        return R.error(ResultCode.ERROR, null, EntityUtils.toString(response.getEntity()));
+                    }
+                } else if (statusCode == 204) {
+                    System.out.println("success");
+                } else {
+                    System.out.println("failed,resp code = " + statusCode + ",return body = " + EntityUtils.toString(response.getEntity()));
+                }
+
+            } finally {
+                response.close();
+            }
+        } catch (IOException e) {
+            log.info("error is {}", e.getLocalizedMessage());
+            return R.error(ResultCode.ERROR, null, e.getLocalizedMessage());
+        }
+
+        return R.ok("订单申请退款成功", map);
+    }
 
     private R querySingleRefundProcess(QuerySingleRefundDto querySingleRefundDto) {return null;}
 
-    private R refundResultNotifyProcess(RefundResultNotificationDto refundResultNotificationDto) {return null;}
+    private R refundResultNotifyProcess(RefundResultNotificationEncryptDto refundResultNotificationEncryptDto) {
+        return null;
+    }
 
     private R applyTransactionBillProcess(AppleFundBillDto appleFundBillDto){return null;}
 

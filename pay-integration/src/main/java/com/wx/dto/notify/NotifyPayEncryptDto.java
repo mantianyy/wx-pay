@@ -37,10 +37,10 @@ public class NotifyPayEncryptDto {
         private String algorithm;
         @ApiModelProperty("数据密文")
         @JSONField(name = "ciphertext")
-        private String cipherText;
+        private String ciphertext;
         @ApiModelProperty("附加数据")
         @JSONField(name = "associated_data")
-        private String associatedData;
+        private String associated_data;
         @ApiModelProperty("随机串")
         @JSONField(name = "nonce")
         private String nonce;

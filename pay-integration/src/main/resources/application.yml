@@ -37,6 +37,8 @@ wx:
   pay_order_notify: https://gt45587346.zicp.fun/pay-integration/pay/payNotify
   #查询订单
   query-order: https://api.mch.weixin.qq.com/v3/pay/transactions/id/
+  #查询商户订单
+  query-merchant-order: https://api.mch.weixin.qq.com/v3/pay/transactions/out-trade-no/
   #关闭订单
   close-order: https://api.mch.weixin.qq.com/v3/pay/transactions/out-trade-no/{out-trade-no}/close
   #申请退款
