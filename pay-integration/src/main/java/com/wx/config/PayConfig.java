@@ -60,4 +60,35 @@ public class PayConfig {
                 .build();
         return httpClient;
     }
+
+
+    @Bean
+    public WechatPayHttpClientBuilder wechatPayHttpClientBuilder() throws Exception {
+        String path = ResourceUtils.getFile("classpath:" + payProperties.getCert()).getPath();
+        if(StringUtils.isEmpty(path)){
+            throw new RuntimeException("文件路径不存在");
+        }
+        String privateKey = FileUtil.getValue(path);
+        PrivateKey merchantPrivateKey = PemUtil.loadPrivateKey(privateKey);
+        // 获取证书管理器实例
+        certificatesManager = CertificatesManager.getInstance();
+        // 添加代理服务器
+        certificatesManager.setProxy(proxy);
+        // 向证书管理器增加需要自动更新平台证书的商户信息
+        certificatesManager.putMerchant(payProperties.getMchId(), new WechatPay2Credentials(payProperties.getMchId(),
+                        new PrivateKeySigner(payProperties.getMchSerialno(), merchantPrivateKey)),
+                //payProperties.getBytes(StandardCharsets.UTF_8)
+                payProperties.getApiV3Key().getBytes(StandardCharsets.UTF_8));
+        // 从证书管理器中获取verifier
+        verifier = certificatesManager.getVerifier(payProperties.getMchId());
+        // 构造httpclient
+        httpClient = WechatPayHttpClientBuilder.create()
+                .withMerchant(payProperties.getMchId(), payProperties.getMchSerialno(), merchantPrivateKey)
+                .withValidator(new WechatPay2Validator(verifier))
+                .build();
+        WechatPayHttpClientBuilder wechatPayHttpClientBuilder =  WechatPayHttpClientBuilder.create().
+                withMerchant(payProperties.getMchId(), payProperties.getMchSerialno(), merchantPrivateKey)
+                .withValidator((response) -> true);
+        return wechatPayHttpClientBuilder;
+    }
 }

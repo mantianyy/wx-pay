@@ -13,9 +13,10 @@ import com.wx.common.CurrencyEnum;
 import com.wx.common.R;
 import com.wx.common.ResultCode;
 import com.wx.common.TransactionBillEnum;
-import com.wx.dto.apply.AppleFundBillDto;
-import com.wx.dto.apply.AppleTradeBillDto;
+import com.wx.dto.apply.ApplyFundBillDto;
+import com.wx.dto.apply.ApplyTradeBillDto;
 import com.wx.dto.apply.ApplyRefundDto;
+import com.wx.dto.bill.BillDto;
 import com.wx.dto.create.CreateOrderDto;
 import com.wx.dto.notify.NotifyPayEncryptDto;
 import com.wx.dto.query.MerchantOrderQueryDto;
@@ -30,6 +31,7 @@ import com.wx.util.RSAUtil;
 import com.wx.util.StreamUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.HttpClient;
@@ -41,10 +43,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
@@ -64,7 +63,6 @@ public class PayController {
     private PayProperties payProperties;
     @Resource
     private HttpClient httpClient;
-
     @Resource
     private WechatPayHttpClientBuilder wechatPayHttpClientBuilder;
 
@@ -116,20 +114,20 @@ public class PayController {
 
     @PostMapping(value = "/applyTransactionBill")
     @ApiOperation(value = "7.申请交易账单")
-    public Map applyTransactionBill(@RequestBody AppleFundBillDto appleFundBillDto) {
-        return applyTransactionBillProcess(appleFundBillDto);
+    public Map applyTransactionBill(@RequestBody ApplyTradeBillDto applyTradeBillDto) {
+        return applyTransactionBillProcess(applyTradeBillDto);
     }
 
     @PostMapping(value = "/applyFundBill")
     @ApiOperation(value = "8.申请资金账单")
-    public Map applyFundBill(@RequestBody AppleTradeBillDto appleTradeBillDto) {
-        return applyFundBillProcess(appleTradeBillDto);
+    public Map applyFundBill(@RequestBody ApplyFundBillDto applyTradeBillDto) {
+        return applyFundBillProcess(applyTradeBillDto);
     }
 
     @PostMapping(value = "/downloadBill")
     @ApiOperation(value = "9.下载账单")
-    public void downloadBill(@RequestBody Map map, HttpServletResponse httpResponse) throws IOException {
-        downloadBillProcess(map,httpResponse);
+    public void downloadBill(@RequestParam(name = "url")String url, HttpServletResponse httpResponse) throws IOException {
+        downloadBillProcess(url,httpResponse);
     }
 
     @PostMapping(value = "/sign")
@@ -409,11 +407,47 @@ public class PayController {
             log.info("error is {}", e.getLocalizedMessage());
             return R.error(ResultCode.ERROR, null, e.getLocalizedMessage());
         }
-
         return R.ok("订单申请退款成功", map);
     }
 
-    private R querySingleRefundProcess(QuerySingleRefundDto querySingleRefundDto) {return null;}
+    @SneakyThrows
+    private R querySingleRefundProcess(QuerySingleRefundDto querySingleRefundDto) {
+        if (StringUtils.isEmpty(querySingleRefundDto.getOutRefundNo())) {
+            return R.error("outRefundNo 为空");
+        }
+        String refundQueryUrl = payProperties.getRefundQuery().replaceAll("\\{out-refund-no}", "");
+        StringBuilder stringBuilder = new StringBuilder(refundQueryUrl);
+        stringBuilder.append(querySingleRefundDto.getOutRefundNo());
+
+        HttpGet httpGet = new HttpGet(stringBuilder.toString());
+        StringEntity entity = new StringEntity("", "UTF-8");
+        entity.setContentType("application/json");
+        httpGet.setHeader("Accept", "application/json");
+
+        String jsonRes = null;
+        CloseableHttpResponse response = null;
+        //查询单笔退款信息
+        try {
+            response = (CloseableHttpResponse) httpClient.execute(httpGet);
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode == 200) {
+                System.out.println("success,return body = " + EntityUtils.toString(response.getEntity()));
+                //解析prepay_id
+                jsonRes = EntityUtils.toString(response.getEntity());
+            } else if (statusCode == 204) {
+                System.out.println("success");
+            } else {
+                System.out.println("failed,resp code = " + statusCode + ",return body = " + EntityUtils.toString(response.getEntity()));
+                return R.error("订单查询失败");
+            }
+        } catch (Exception e) {
+            log.info("订单查询异常 {}", e.getLocalizedMessage());
+            return R.error("订单查询异常");
+        } finally {
+            response.close();
+        }
+        return R.ok(JSON.parseObject(jsonRes));
+    }
 
     private Map refundResultNotifyProcess(RefundResultNotificationEncryptDto refundResultNotificationEncryptDto) {
         Map result = new HashMap();
@@ -460,16 +494,17 @@ public class PayController {
         return result;
     }
 
-    private Map applyTransactionBillProcess(AppleFundBillDto appleFundBillDto){
-        if(ObjectUtil.isEmpty(appleFundBillDto)){
+    @SneakyThrows
+    private Map applyTransactionBillProcess(ApplyTradeBillDto applyTradeBillDto){
+        if(ObjectUtil.isEmpty(applyTradeBillDto)){
             return R.error("参数为空");
         }
-        if (StringUtils.isEmpty(appleFundBillDto.getBillDate())) {
+        if (StringUtils.isEmpty(applyTradeBillDto.getBillDate())) {
             return R.error("bill_date 为空");
         }
         String applyTradebillUrl = payProperties.getApplyTradebill();
         StringBuilder stringBuilder = new StringBuilder(applyTradebillUrl);
-        stringBuilder.append("?bill_date=" + appleFundBillDto.getBillDate());
+        stringBuilder.append("?bill_date=" + applyTradeBillDto.getBillDate());
         stringBuilder.append("&bill_type=ALL");
         stringBuilder.append("&tar_type=GZIP");
 
@@ -498,27 +533,24 @@ public class PayController {
             log.info("订单查询异常 {}", e.getLocalizedMessage());
             return R.error("订单查询异常");
         } finally {
-            try {
-                response.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            response.close();
         }
         return R.ok(JSON.parseObject(jsonRes));
     }
 
-    private Map applyFundBillProcess(AppleTradeBillDto  appleTradeBillDto){
-        if (ObjectUtil.isEmpty(appleTradeBillDto)) {
+    @SneakyThrows
+    private Map applyFundBillProcess(ApplyFundBillDto applyFundBillDto){
+        if (ObjectUtil.isEmpty(applyFundBillDto)) {
             return R.error("参数为空");
         }
-        if (StringUtils.isEmpty(appleTradeBillDto.getBillDate())) {
+        if (StringUtils.isEmpty(applyFundBillDto.getBillDate())) {
             return R.error("bill_date 为空");
         }
         String applyTradebillUrl = payProperties.getApplyFundbill();
         StringBuilder stringBuilder = new StringBuilder(applyTradebillUrl);
-        stringBuilder.append("?bill_date=" + appleTradeBillDto.getBillDate());
+        stringBuilder.append("?bill_date=" + applyFundBillDto.getBillDate());
         stringBuilder.append("&account_type=BASIC");
-        stringBuilder.append("&tar_type=" + appleTradeBillDto.getTarType());
+        stringBuilder.append("&tar_type=" + applyFundBillDto.getTarType());
 
         HttpGet httpGet = new HttpGet(stringBuilder.toString());
         StringEntity entity = new StringEntity("", "UTF-8");
@@ -545,22 +577,18 @@ public class PayController {
             log.info("订单查询异常 {}", e.getLocalizedMessage());
             return R.error("订单查询异常");
         } finally {
-            try {
-                response.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            response.close();
         }
         return R.ok(JSON.parseObject(jsonRes));
     }
 
-    private void downloadBillProcess(Map map,HttpServletResponse httpResponse) throws IOException {
-        String downloadUrl = (String) map.get("downloadUrl");
-        if(StringUtils.isEmpty(downloadUrl)){
+    @SneakyThrows
+    private void downloadBillProcess(String url, HttpServletResponse httpResponse) {
+        if(StringUtils.isEmpty(url)){
             httpResponse.getWriter().write(JSON.toJSONString(R.error("downloadUrl字段缺失")));
             return;
         }
-        HttpGet httpGet = new HttpGet(downloadUrl);
+        HttpGet httpGet = new HttpGet(url);
         httpGet.setHeader("Accept", "application/json");
         //请求下载地址
         CloseableHttpResponse response = null;
