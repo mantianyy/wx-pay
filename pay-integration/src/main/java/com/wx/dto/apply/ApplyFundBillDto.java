@@ -8,7 +8,7 @@ import lombok.Data;
 
 @ApiModel("申请资金账单入参模型")
 @Data
-public class AppleFundBillDto {
+public class ApplyFundBillDto {
 
     @ApiModelProperty("账单日期")
     @JSONField(name = "bill_date")

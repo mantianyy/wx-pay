@@ -11,7 +11,7 @@ import lombok.Data;
  */
 @ApiModel("申请交易账单出参模型")
 @Data
-public class AppleTradeBillResDto {
+public class ApplyTradeBillResDto {
     @ApiModelProperty("哈希类型")
     @JSONField(name = "hash_type")
     private String hashType;
