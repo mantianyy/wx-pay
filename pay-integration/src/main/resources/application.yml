@@ -53,7 +53,9 @@ wx:
   apply-fundbill: https://api.mch.weixin.qq.com/v3/bill/tradebill
   #下载账单
   download-bill: https://api.mch.weixin.qq.com/v3/bill/fundflowbill
+  #appid
   app-id: wx6f8b36de02f6af65
+  #appid 私钥
   secret: f2054aa12404c43094e4b541b3d4426d
 
 
