@@ -340,7 +340,6 @@ public class PayController {
     }
 
     private R applyRefundProcess(ApplyRefundDto applyRefundDto) {
-        Map result = new HashMap();
         Map map = new HashMap();
         if(ObjectUtil.isEmpty(applyRefundDto)){
             return R.error("参数为空");
