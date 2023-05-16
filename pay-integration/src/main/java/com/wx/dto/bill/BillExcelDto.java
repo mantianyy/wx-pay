@@ -1,4 +1,4 @@
-package com.wx.dto.wx.dto.excel;
+package com.wx.dto.bill;
 
 import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.annotation.write.style.ColumnWidth;

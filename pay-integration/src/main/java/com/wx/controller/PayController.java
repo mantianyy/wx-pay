@@ -17,6 +17,7 @@ import com.wx.dto.apply.ApplyFundBillDto;
 import com.wx.dto.apply.ApplyTradeBillDto;
 import com.wx.dto.apply.ApplyRefundDto;
 import com.wx.dto.bill.BillDto;
+import com.wx.dto.bill.BillExcelDto;
 import com.wx.dto.create.CreateOrderDto;
 import com.wx.dto.notify.NotifyPayEncryptDto;
 import com.wx.dto.query.MerchantOrderQueryDto;
@@ -24,8 +25,6 @@ import com.wx.dto.query.PayOrderQueryDto;
 import com.wx.dto.query.QuerySingleRefundDto;
 import com.wx.dto.refund.RefundResultNotificationEncryptDto;
 import com.wx.dto.sign.SignDto;
-import com.wx.dto.wx.dto.PayerDto;
-import com.wx.dto.wx.dto.excel.BillExcelDto;
 import com.wx.properties.PayProperties;
 import com.wx.util.RSAUtil;
 import com.wx.util.StreamUtils;
@@ -168,31 +167,14 @@ public class PayController {
             return R.error("payer不能为空!");
         }
         HttpPost httpPost = new HttpPost(payProperties.getCreateOrder());
-//        createOrderDto.setOpenId(payProperties.getOpenId());
-//        createOrderDto.setAppId(payProperties.getAppId());
-//        createOrderDto.setMchId(payProperties.getMchId());
-//        String outTradeNo = UUID.randomUUID().toString().replaceAll("-", "").toUpperCase();
-//        createOrderDto.setOutTradeNo(outTradeNo);
-//        createOrderDto.setNotifyUrl(payProperties.getPayOrderNotify());
+        createOrderDto.setOpenId(payProperties.getOpenId());
+        createOrderDto.setAppId(payProperties.getAppId());
+        createOrderDto.setMchId(payProperties.getMchId());
+        String outTradeNo = UUID.randomUUID().toString().replaceAll("-", "").toUpperCase();
+        createOrderDto.setOutTradeNo(outTradeNo);
+        createOrderDto.setNotifyUrl(payProperties.getPayOrderNotify());
 
-        com.wx.dto.wx.dto.CreateOrderDto createOrderDto1 = new com.wx.dto.wx.dto.CreateOrderDto();
-        createOrderDto1.setAppId(payProperties.getAppId());
-        createOrderDto1.setMchId(payProperties.getMchId());
-        String outTradeNo = UUID.randomUUID().
-                toString().replaceAll("-", "").toUpperCase();
-        createOrderDto1.setOutTradeNo(outTradeNo);
-        createOrderDto1.setDesc("Image形象店-深圳腾大-QQ公仔");
-        createOrderDto1.setNotifyUrl(payProperties.getPayOrderNotify());
-
-        com.wx.dto.wx.dto.AmountDto amountDto = new com.wx.dto.wx.dto.AmountDto();
-        amountDto.setCurrency(CurrencyEnum.CNY);
-        amountDto.setTotal(1);
-        createOrderDto1.setAmountDto(amountDto);
-        PayerDto payerDto = new PayerDto();
-        payerDto.setOpenId("oUYWT5AvRQgX1Z9prDMqXrwYY_wk");
-        createOrderDto1.setPayerDto(payerDto);
-
-        String reqParma = JSONObject.toJSONString(createOrderDto1);
+        String reqParma = JSONObject.toJSONString(createOrderDto);
         StringEntity entity = new StringEntity(reqParma, "utf-8");
         entity.setContentType("application/json");
         httpPost.setEntity(entity);
