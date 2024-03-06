@@ -1,6 +1,7 @@
 package com.wx.config;
 
 
+import cn.hutool.core.util.ObjectUtil;
 import com.wechat.pay.contrib.apache.httpclient.WechatPayHttpClientBuilder;
 import com.wechat.pay.contrib.apache.httpclient.auth.PrivateKeySigner;
 import com.wechat.pay.contrib.apache.httpclient.auth.Verifier;
@@ -50,12 +51,12 @@ public class PayConfig {
         logger.info("cert is2 {} ",payProperties.getCert());
         org.springframework.core.io.Resource resource = new ClassPathResource(payProperties.getCert());
         logger.info("cert is3 {} ",payProperties.getCert());
-        if(StringUtils.isEmpty(resource.getFile().getPath())){
+        if(ObjectUtil.isNotNull(resource.getInputStream())){
             throw new RuntimeException("文件路径不存在");
         }
         logger.info("cert is4 {} ",payProperties.getCert());
         String privateKey = IOUtils.toString(new BufferedInputStream(resource.getInputStream()));
-        logger.info("cert is5 {} ",payProperties.getCert());
+        logger.info("cert is5 {} ",privateKey);
         PrivateKey merchantPrivateKey = PemUtil.loadPrivateKey(privateKey);
         // 获取证书管理器实例
         certificatesManager = CertificatesManager.getInstance();
@@ -80,12 +81,15 @@ public class PayConfig {
     @Bean
     public WechatPayHttpClientBuilder wechatPayHttpClientBuilder() throws Exception {
         logger.info("测试开始 wechatPayHttpClientBuilder");
-        logger.info("cert is {} ",payProperties.getCert());
+        logger.info("cert is1 {} ",payProperties.getCert());
         org.springframework.core.io.Resource resource = new ClassPathResource(payProperties.getCert());
-        if(StringUtils.isEmpty(resource.getFile().getPath())){
+        logger.info("cert is2 {} ",payProperties.getCert());
+        if(ObjectUtil.isNotNull(resource.getInputStream())){
             throw new RuntimeException("文件路径不存在");
         }
+        logger.info("cert is3 {} ",payProperties.getCert());
         String privateKey = IOUtils.toString(resource.getInputStream());
+        logger.info("cert is4 {} ",privateKey);
         PrivateKey merchantPrivateKey = PemUtil.loadPrivateKey(privateKey);
         // 获取证书管理器实例
         certificatesManager = CertificatesManager.getInstance();
