@@ -24,7 +24,7 @@ echo "3.1 docker'image [pay-integration] delete successfully！ "
 
 echo "4. docker's image [pay-integration] build successfully！" >> /deploy-jar/post.log
 
-docker run -d -p 8088:8088 --name pay-integration  -v /var/log/:/var/log pay-integration  >> /deploy-jar/post.log
+docker run -d -p 8089:8089 --name pay-integration  -v /var/log/:/var/log pay-integration  >> /deploy-jar/post.log
 
 echo "5. docker's image [pay-integration] deploy successfully! " >> /deploy-jar/post.log
 
