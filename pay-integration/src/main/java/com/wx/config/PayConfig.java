@@ -41,11 +41,11 @@ public class PayConfig {
 
     @Bean
     public HttpClient httpClient() throws Exception {
-        String path = ResourceUtils.getFile("classpath:" + payProperties.getCert()).getPath();
-        if(StringUtils.isEmpty(path)){
+        org.springframework.core.io.Resource resource = new ClassPathResource(payProperties.getCert());
+        if(StringUtils.isEmpty(resource.getFile().getPath())){
             throw new RuntimeException("文件路径不存在");
         }
-        String privateKey = FileUtil.getValue(path);
+        String privateKey = IOUtils.toString(resource.getInputStream());
         PrivateKey merchantPrivateKey = PemUtil.loadPrivateKey(privateKey);
         // 获取证书管理器实例
         certificatesManager = CertificatesManager.getInstance();
