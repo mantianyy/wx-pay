@@ -40,6 +40,9 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -57,6 +60,7 @@ import java.util.*;
 @Api(tags = "微信支付接口测试文档")
 @Slf4j
 public class PayController {
+    Logger logger = LoggerFactory.getLogger(PayController.class);
 
     @Autowired
     private PayProperties payProperties;
@@ -156,6 +160,16 @@ public class PayController {
             return R.error(errorMsg);
         }
         return R.ok(resMap);
+    }
+
+    @PostMapping(value = "/info")
+    @ApiOperation(value = "11.日志测试")
+    public R info() {
+        MDC.put("requestId", UUID.randomUUID().toString().toLowerCase());
+        logger.info("测试接口 {}", "test");
+        logger.error("测试接口 error {}","错误");
+        logger.warn("测试接口 waring {}","警告");
+        return R.ok("日志测试",null);
     }
 
     private R createOrderProcess(CreateOrderDto createOrderDto) {
