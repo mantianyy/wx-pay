@@ -51,7 +51,7 @@ public class PayConfig {
         logger.info("cert is2 {} ",payProperties.getCert());
         org.springframework.core.io.Resource resource = new ClassPathResource(payProperties.getCert());
         logger.info("cert is3 {} ",payProperties.getCert());
-        if(ObjectUtil.isNotNull(resource.getInputStream())){
+        if(ObjectUtil.isNull(resource.getInputStream())){
             throw new RuntimeException("文件路径不存在");
         }
         logger.info("cert is4 {} ",payProperties.getCert());
@@ -84,7 +84,7 @@ public class PayConfig {
         logger.info("cert is1 {} ",payProperties.getCert());
         org.springframework.core.io.Resource resource = new ClassPathResource(payProperties.getCert());
         logger.info("cert is2 {} ",payProperties.getCert());
-        if(ObjectUtil.isNotNull(resource.getInputStream())){
+        if(ObjectUtil.isNull(resource.getInputStream())){
             throw new RuntimeException("文件路径不存在");
         }
         logger.info("cert is3 {} ",payProperties.getCert());
