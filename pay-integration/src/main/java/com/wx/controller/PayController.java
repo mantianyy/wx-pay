@@ -162,7 +162,7 @@ public class PayController {
         return R.ok(resMap);
     }
 
-    @PostMapping(value = "/info")
+    @GetMapping(value = "/info")
     @ApiOperation(value = "11.日志测试")
     public R info() {
         MDC.put("requestId", UUID.randomUUID().toString().toLowerCase());
