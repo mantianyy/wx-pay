@@ -23,7 +23,7 @@ logging:
     com.emos.wx.db.dao : warn
   pattern:
     console: "%d{HH:mm:ss}  %-5level  %msg%n"
-
+  config: classpath:log/logback-spring.xml
 
 wx:
   cert: cert/apiclient_key.pem
