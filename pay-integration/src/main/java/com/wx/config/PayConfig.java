@@ -10,15 +10,20 @@ import com.wechat.pay.contrib.apache.httpclient.cert.CertificatesManager;
 import com.wechat.pay.contrib.apache.httpclient.util.PemUtil;
 import com.wx.properties.PayProperties;
 import com.wx.util.FileUtil;
+import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.client.HttpClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ResourceUtils;
 import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 
@@ -64,11 +69,11 @@ public class PayConfig {
 
     @Bean
     public WechatPayHttpClientBuilder wechatPayHttpClientBuilder() throws Exception {
-        String path = ResourceUtils.getFile("classpath:" + payProperties.getCert()).getPath();
-        if(StringUtils.isEmpty(path)){
+        org.springframework.core.io.Resource resource = new ClassPathResource(payProperties.getCert());
+        if(StringUtils.isEmpty(resource.getFile().getPath())){
             throw new RuntimeException("文件路径不存在");
         }
-        String privateKey = FileUtil.getValue(path);
+        String privateKey = IOUtils.toString(resource.getInputStream());
         PrivateKey merchantPrivateKey = PemUtil.loadPrivateKey(privateKey);
         // 获取证书管理器实例
         certificatesManager = CertificatesManager.getInstance();
