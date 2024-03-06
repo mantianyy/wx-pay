@@ -8,11 +8,14 @@ import com.wechat.pay.contrib.apache.httpclient.auth.WechatPay2Credentials;
 import com.wechat.pay.contrib.apache.httpclient.auth.WechatPay2Validator;
 import com.wechat.pay.contrib.apache.httpclient.cert.CertificatesManager;
 import com.wechat.pay.contrib.apache.httpclient.util.PemUtil;
+import com.wx.controller.PayController;
 import com.wx.properties.PayProperties;
 import com.wx.util.FileUtil;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.client.HttpClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
@@ -32,6 +35,7 @@ import java.security.PrivateKey;
  */
 @Configuration
 public class PayConfig {
+    Logger logger = LoggerFactory.getLogger(PayConfig.class);
     @Resource
     private PayProperties payProperties;
     private CertificatesManager certificatesManager;
@@ -41,6 +45,8 @@ public class PayConfig {
 
     @Bean
     public HttpClient httpClient() throws Exception {
+        logger.info("测试开始 httpClient");
+        logger.info("cert is {} ",payProperties.getCert());
         org.springframework.core.io.Resource resource = new ClassPathResource(payProperties.getCert());
         if(StringUtils.isEmpty(resource.getFile().getPath())){
             throw new RuntimeException("文件路径不存在");
@@ -69,6 +75,8 @@ public class PayConfig {
 
     @Bean
     public WechatPayHttpClientBuilder wechatPayHttpClientBuilder() throws Exception {
+        logger.info("测试开始 wechatPayHttpClientBuilder");
+        logger.info("cert is {} ",payProperties.getCert());
         org.springframework.core.io.Resource resource = new ClassPathResource(payProperties.getCert());
         if(StringUtils.isEmpty(resource.getFile().getPath())){
             throw new RuntimeException("文件路径不存在");
